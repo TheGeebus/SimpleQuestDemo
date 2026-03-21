@@ -168,9 +168,9 @@ The following features are in active development:
 
 ## Contributing
 
-Contributions are welcome. Please open an issue before beginning work on a significant change so the approach can be discussed first. Pull requests should target the `main` branch and include a brief description of what changed and why.
+Community feedback is welcome and valuable at this stage. If you encounter a bug, a compatibility issue, or have a feature request, please open an issue with the engine version and a description of the problem or suggestion.
 
-Contributions are accepted under the current Polyform Noncommercial license terms. When the project relicenses to MIT -- planned upon a future funding milestone -- contributors whose code is included at that time may be contacted for permission to include their work in the relicensed codebase.
+Code contributions via pull request are not being accepted during the current pre-release phase while licensing terms are being finalized. This will be revisited ahead of the first public release. Watch the repository for updates.
 
 For bug reports, include the engine version, a minimal reproduction case, and any relevant output from the `LogSimpleQuest` log category.
 
