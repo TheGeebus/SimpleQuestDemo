@@ -1,8 +1,10 @@
 # SimpleQuest
 
-A free, open-source Unreal Engine plugin for non-linear, branching quest systems. SimpleQuest is built on a directed acyclic graph of quest steps with a typed publish/subscribe event bus, giving designers the freedom to craft questlines that feel alive rather than scripted.
+A source-available Unreal Engine plugin for non-linear, branching quest systems, free for non-commercial use. SimpleQuest is built on a directed acyclic graph of quest steps with a typed publish/subscribe event bus, giving designers the freedom to craft questlines that feel alive rather than scripted.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+The version here is for Unreal Engine 5.6.
+
+[![License: Polyform NC 1.0](https://img.shields.io/badge/License-Polyform%20NC%201.0-blue.svg)](LICENSE)
 
 ---
 
@@ -168,10 +170,14 @@ The following features are in active development:
 
 Contributions are welcome. Please open an issue before beginning work on a significant change so the approach can be discussed first. Pull requests should target the `main` branch and include a brief description of what changed and why.
 
+Contributions are accepted under the current Polyform Noncommercial license terms. When the project relicenses to MIT -- planned upon a future funding milestone -- contributors whose code is included at that time may be contacted for permission to include their work in the relicensed codebase.
+
 For bug reports, include the engine version, a minimal reproduction case, and any relevant output from the `LogSimpleQuest` log category.
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for full terms.
+SimpleQuest is licensed under [Polyform Noncommercial 1.0.0](LICENSE). It is free to use, modify, and distribute for any non-commercial purpose. Commercial use requires a separate license.
+
+The project is planned to relicense to MIT upon a future funding milestone, at which point it will be free for all uses without restriction. Commercial licensing terms will be announced separately ahead of that transition.
