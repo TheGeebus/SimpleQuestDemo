@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
+#include "GraphEditor.h"
+#include "GraphEditorActions.h"
 
 class UQuestlineGraph;
 class SGraphEditor;
@@ -11,10 +13,7 @@ class SGraphEditor;
 class FQuestlineGraphEditor : public FAssetEditorToolkit
 {
 public:
-	void InitQuestlineGraphEditor(
-		const EToolkitMode::Type Mode,
-		const TSharedPtr<IToolkitHost>& InitToolkitHost,
-		UQuestlineGraph* InQuestlineGraph);
+	void InitQuestlineGraphEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UQuestlineGraph* InQuestlineGraph);
 
 	// FAssetEditorToolkit interface
 	virtual FName GetToolkitFName() const override;
@@ -27,9 +26,12 @@ public:
 private:
 	TSharedRef<SDockTab> SpawnGraphViewportTab(const FSpawnTabArgs& Args);
 	TSharedRef<SGraphEditor> CreateGraphEditorWidget();
+	void BindGraphCommands();
+	void DeleteSelectedNodes();
 
 	TObjectPtr<UQuestlineGraph> QuestlineGraph;
 	TSharedPtr<SGraphEditor> GraphEditorWidget;
-
+	TSharedPtr<FUICommandList> GraphEditorCommands;
+	
 	static const FName GraphViewportTabId;
 };

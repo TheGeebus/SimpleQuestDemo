@@ -5,6 +5,8 @@
 #include "GraphEditor.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
+#include "Framework/Commands/GenericCommands.h"
+
 
 const FName FQuestlineGraphEditor::GraphViewportTabId(TEXT("QuestlineGraphEditor_GraphViewport"));
 
@@ -27,6 +29,8 @@ void FQuestlineGraphEditor::InitQuestlineGraphEditor(
                 ->AddTab(GraphViewportTabId, ETabState::OpenedTab)
             )
         );
+    
+    BindGraphCommands();
 
     InitAssetEditor(
         Mode,
@@ -92,5 +96,37 @@ TSharedRef<SGraphEditor> FQuestlineGraphEditor::CreateGraphEditorWidget()
 
     return SNew(SGraphEditor)
         .IsEditable(true)
-        .GraphToEdit(QuestlineGraph->QuestlineEdGraph);
+        .GraphToEdit(QuestlineGraph->QuestlineEdGraph)
+        .AdditionalCommands(GraphEditorCommands);
+}
+
+void FQuestlineGraphEditor::BindGraphCommands()
+{
+    FGraphEditorCommands::Register();
+
+    GraphEditorCommands = MakeShared<FUICommandList>();
+    GraphEditorCommands->MapAction(
+        FGenericCommands::Get().Delete,
+        FExecuteAction::CreateSP(this, &FQuestlineGraphEditor::DeleteSelectedNodes));
+}
+
+void FQuestlineGraphEditor::DeleteSelectedNodes()
+{
+    if (!GraphEditorWidget.IsValid()) return;
+
+    const FScopedTransaction Transaction(
+        NSLOCTEXT("SimpleQuestEditor", "DeleteSelectedNodes", "Delete Selected Nodes"));
+
+    QuestlineGraph->QuestlineEdGraph->Modify();
+
+    for (UObject* Obj : GraphEditorWidget->GetSelectedNodes())
+    {
+        UEdGraphNode* Node = Cast<UEdGraphNode>(Obj);
+        if (Node && Node->CanUserDeleteNode())
+        {
+            Node->Modify();
+            Node->GetSchema()->BreakNodeLinks(*Node);
+            QuestlineGraph->QuestlineEdGraph->RemoveNode(Node);
+        }
+    }
 }

@@ -6,6 +6,7 @@
 #include "Modules/ModuleInterface.h"
 
 class FQuestlineGraphAssetTypeActions;
+class FQuestlineGraphNodeFactory;
 
 class FSimpleQuestEditor : public IModuleInterface
 {
@@ -15,4 +16,5 @@ public:
 
 private:
 	TSharedPtr<FQuestlineGraphAssetTypeActions> QuestlineGraphAssetTypeActions;
+	TSharedPtr<FQuestlineGraphNodeFactory> QuestlineGraphNodeFactory;
 };

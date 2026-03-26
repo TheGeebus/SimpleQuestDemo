@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphSchema.h"
+#include "Nodes/QuestlineNode_Knot.h"
+#include "Nodes/QuestlineNode_Exit_Success.h"
+#include "Nodes/QuestlineNode_Exit_Failure.h"
 #include "QuestlineGraphSchema.generated.h"
 
 UCLASS()
@@ -26,4 +29,12 @@ public:
 
 	// Returns the name to display for this graph type in the editor
 	virtual FLinearColor GetPinTypeColor(const FEdGraphPinType& PinType) const override;
+
+	//virtual bool TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) const override;
+	
+	virtual FConnectionDrawingPolicy* CreateConnectionDrawingPolicy(
+	int32 InBackLayerID, int32 InFrontLayerID, float InZoomFactor,
+	const FSlateRect& InClippingRect, FSlateWindowElementList& InDrawElements,
+	UEdGraph* InGraphObj) const override;
+
 };
