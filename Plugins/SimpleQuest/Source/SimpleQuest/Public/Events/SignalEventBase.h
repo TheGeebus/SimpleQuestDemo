@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GameplayTagContainer.h"
 #include "SignalEventBase.generated.h"
 
 USTRUCT(BlueprintType)
@@ -14,4 +15,7 @@ struct FSignalEventBase
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName ChannelObjectID;
+
+	UPROPERTY(BlueprintReadWrite)
+	FGameplayTag EventTag;
 };

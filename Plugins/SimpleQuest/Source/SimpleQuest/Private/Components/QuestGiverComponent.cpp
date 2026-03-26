@@ -61,7 +61,7 @@ void UQuestGiverComponent::OnQuestEnabledEventReceived(const FQuestEnabledEvent&
 	SetQuestGiverActivated(QuestEnabledEvent.QuestClass, QuestEnabledEvent.ChannelObjectID, QuestEnabledEvent.bIsActivated);
 }
 
-void UQuestGiverComponent::StartQuest(UQuest* QuestToStart)
+void UQuestGiverComponent::GiveQuest(UQuest* QuestToStart)
 {
 	if (QuestToStart)
 	{

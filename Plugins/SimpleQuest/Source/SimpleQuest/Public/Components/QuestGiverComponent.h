@@ -40,7 +40,7 @@ protected:
 private:
 	
 	UFUNCTION(BlueprintCallable)
-	void StartQuest(UQuest* QuestToStart);
+	void GiveQuest(UQuest* QuestToStart);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetQuestGiverActivated(const TSubclassOf<UQuest>& QuestClassToEnable, const FName& QuestID, bool bIsQuestActive) override;

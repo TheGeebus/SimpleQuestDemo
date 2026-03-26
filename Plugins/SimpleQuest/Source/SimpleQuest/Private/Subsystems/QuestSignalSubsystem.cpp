@@ -9,13 +9,25 @@
 void UQuestSignalSubsystem::Deinitialize()
 {
 	bIsShuttingDown = true;
-
 	for (auto& Pair : NativeQuestEventChannels)
 	{
 		Pair.Value.Clear();
 	} 
 	NativeQuestEventChannels.Empty();
+	for (auto& Pair : TaggedEventChannels)
+	{
+		Pair.Value.Clear();
+	}
+	TaggedEventChannels.Empty();
 	Super::Deinitialize();
+}
+
+void UQuestSignalSubsystem::UnsubscribeTypedByTag(const FGameplayTag EventTag, const FDelegateHandle Handle)
+{
+	if (TMulticastDelegate<void(const FInstancedStruct&)>* Delegate = TaggedEventChannels.Find(EventTag))
+	{
+		Delegate->Remove(Handle);
+	}
 }
 
 void UQuestSignalSubsystem::SubscribeToQuestEvent(const TSubclassOf<UObject>& QuestClass, const UScriptStruct* EventClass, UObject* Listener)

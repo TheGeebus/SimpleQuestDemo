@@ -4,6 +4,8 @@ public class SimpleQuestEditor: ModuleRules
 {
 	public SimpleQuestEditor(ReadOnlyTargetRules Target) : base(Target)
 	{
+		PublicDependencyModuleNames.AddRange(new string[] { "GameplayTags" });
+		
 		PrivateDependencyModuleNames.AddRange(new string[] {"Core", "CoreUObject", "Engine", "UnrealEd", "Settings", "SimpleQuest" });
 
 		if (Target.bBuildEditor)
