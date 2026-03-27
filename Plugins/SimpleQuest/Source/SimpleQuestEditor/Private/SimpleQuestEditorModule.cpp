@@ -1,9 +1,12 @@
-﻿#include "SimpleQuestEditorModule.h"
+﻿#pragma once
+
+#include "SimpleQuestEditorModule.h"
 #include "AssetTypes/QuestlineGraphAssetTypeActions.h"
 #include "AssetToolsModule.h"
 #include "Modules/ModuleManager.h"
 #include "EdGraphUtilities.h"
 #include "SGraphNodeKnot.h"
+#include "Graph/QuestlineGraphSchema.h"
 #include "Nodes/QuestlineNode_Knot.h"
 
 
@@ -30,6 +33,8 @@ void FSimpleQuestEditor::StartupModule()
 	QuestlineGraphNodeFactory = MakeShared<FQuestlineGraphNodeFactory>();
 	FEdGraphUtilities::RegisterVisualNodeFactory(QuestlineGraphNodeFactory);
 
+	QuestlineConnectionFactory = UQuestlineGraphSchema::MakeQuestlineConnectionFactory();
+	FEdGraphUtilities::RegisterVisualPinConnectionFactory(QuestlineConnectionFactory);
 }
 
 void FSimpleQuestEditor::ShutdownModule()
@@ -42,5 +47,53 @@ void FSimpleQuestEditor::ShutdownModule()
 	FEdGraphUtilities::UnregisterVisualNodeFactory(QuestlineGraphNodeFactory);
 	QuestlineGraphNodeFactory.Reset();
 
+	FEdGraphUtilities::UnregisterVisualPinConnectionFactory(QuestlineConnectionFactory);
+	QuestlineConnectionFactory.Reset();
+	
 	QuestlineGraphAssetTypeActions.Reset();
+
+
+
 }
+/*
+class FQuestlineConnectionFactory : public FGraphPanelPinConnectionFactory
+{
+public:
+	virtual FConnectionDrawingPolicy* CreateConnectionPolicy(
+		const UEdGraphSchema* Schema,
+		int32 InBackLayerID, int32 InFrontLayerID,
+		float InZoomFactor,
+		const FSlateRect& InClippingRect,
+		FSlateWindowElementList& InDrawElements,
+		UEdGraph* InGraphObj) const override
+	{
+		if (!Cast<UQuestlineGraphSchema>(Schema))
+			return nullptr;
+
+		// Ask every OTHER registered factory for a policy (picks up Electronic Nodes, etc.)
+		FConnectionDrawingPolicy* InnerPolicy = nullptr;
+		for (const TSharedPtr<FGraphPanelPinConnectionFactory>& OtherFactory
+				: FEdGraphUtilities::VisualPinConnectionFactories)
+		{
+			if (OtherFactory.Get() == this) continue;
+			InnerPolicy = OtherFactory->CreateConnectionPolicy(
+				Schema, InBackLayerID, InFrontLayerID,
+				InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
+			if (InnerPolicy) break;
+		}
+
+		// Fall back to the schema's own policy if no other factory handled it
+		if (!InnerPolicy)
+		{
+			InnerPolicy = Schema->CreateConnectionDrawingPolicy(
+				InBackLayerID, InFrontLayerID,
+				InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
+		}
+
+		return new FQuestlineDashOverlayPolicy(
+			InnerPolicy,
+			InBackLayerID, InFrontLayerID,
+			InZoomFactor, InClippingRect, InDrawElements);
+	}
+};
+*/

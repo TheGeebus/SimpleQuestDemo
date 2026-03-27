@@ -24,10 +24,22 @@
 		{
 			"Name": "SimpleQuestEditor",
 			"Type": "Editor",
-			"LoadingPhase": "Default",
+			"LoadingPhase": "PreDefault",
 			"AdditionalDependencies": [
 				"Settings"
 			]
+		},
+		{
+			"Name": "SimpleQuestEditorEN",
+			"Type": "Editor",
+			"LoadingPhase": "PostDefault"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ElectronicNodes",
+			"Enabled": true,
+			"Optional": true
 		}
 	],
 	"AdditionalPluginConfig": [

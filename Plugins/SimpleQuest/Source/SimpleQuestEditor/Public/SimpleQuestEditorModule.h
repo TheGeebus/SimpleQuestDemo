@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
 
+struct FGraphPanelPinConnectionFactory;
 class FQuestlineGraphAssetTypeActions;
 class FQuestlineGraphNodeFactory;
 
@@ -17,4 +18,5 @@ public:
 private:
 	TSharedPtr<FQuestlineGraphAssetTypeActions> QuestlineGraphAssetTypeActions;
 	TSharedPtr<FQuestlineGraphNodeFactory> QuestlineGraphNodeFactory;
+	TSharedPtr<FGraphPanelPinConnectionFactory> QuestlineConnectionFactory;
 };

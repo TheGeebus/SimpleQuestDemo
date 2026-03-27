@@ -4,15 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphSchema.h"
-#include "Nodes/QuestlineNode_Knot.h"
-#include "Nodes/QuestlineNode_Exit_Success.h"
-#include "Nodes/QuestlineNode_Exit_Failure.h"
 #include "QuestlineGraphSchema.generated.h"
 
+struct FGraphPanelPinConnectionFactory;
 class UQuestlineNode_Quest;
 
+
 UCLASS()
-class UQuestlineGraphSchema : public UEdGraphSchema
+class SIMPLEQUESTEDITOR_API UQuestlineGraphSchema : public UEdGraphSchema
 {
 	GENERATED_BODY()
 
@@ -20,6 +19,8 @@ public:
 	// Called when the graph is first created — populates it with the entry node
 	virtual void CreateDefaultNodesForGraph(UEdGraph& Graph) const override;
 
+	virtual void OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPin* PinB, const FVector2f& GraphPosition) const override;
+	
 	// Find any source quest nodes of a given wire
 	static void CollectSourceQuests(const UEdGraphPin* Pin, TSet<UQuestlineNode_Quest*>& OutSources, TSet<const UEdGraphNode*>& Visited);
 	
@@ -41,5 +42,11 @@ public:
 	int32 InBackLayerID, int32 InFrontLayerID, float InZoomFactor,
 	const FSlateRect& InClippingRect, FSlateWindowElementList& InDrawElements,
 	UEdGraph* InGraphObj) const override;
-
+	
+	static TSharedPtr<FGraphPanelPinConnectionFactory> MakeQuestlineConnectionFactory();
+	
+	// Optional integration point for SimpleQuestEditorEN.
+	static void RegisterENPolicyFactory(TFunction<FConnectionDrawingPolicy*(int32, int32, float, const FSlateRect&, FSlateWindowElementList&, UEdGraph*)> Factory);
+	static void UnregisterENPolicyFactory();
+	static bool IsENPolicyFactoryActive();
 };
