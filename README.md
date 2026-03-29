@@ -4,6 +4,8 @@ A source-available Unreal Engine plugin for non-linear, branching quest systems,
 
 This version is for Unreal Engine 5.6.
 
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 [![License: Polyform NC 1.0](https://img.shields.io/badge/License-Polyform%20NC%201.0-blue.svg)](LICENSE)
 
 ---
