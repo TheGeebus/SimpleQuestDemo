@@ -20,266 +20,215 @@ static void ApplyQuestlineWireParams(UEdGraphPin* OutputPin, UEdGraphPin* InputP
 	if (OutputPin)
 	{
 		const FName Category = OutputPin->PinType.PinCategory;
-		if      (Category == TEXT("QuestSuccess"))  Params.WireColor = SQ_ED_GREEN;
-		else if (Category == TEXT("QuestFailure"))  Params.WireColor = SQ_ED_RED;
-		else                                        Params.WireColor = FLinearColor::White;
+		if (Category == TEXT("QuestSuccess")) Params.WireColor = SQ_ED_GREEN;
+		else if (Category == TEXT("QuestFailure")) Params.WireColor = SQ_ED_RED;
+		else Params.WireColor = FLinearColor::White;
 	}
 	if (InputPin && InputPin->PinName == TEXT("Prerequisites"))
 		Params.bUserFlag1 = true;
 }
 
+// Returns true if OutputPin already leads to any exit node (directly or via reroutes).
+// Enforces: one output pin → at most one exit node.
+static bool HasDownstreamExit(const UEdGraphPin* OutputPin, TSet<const UEdGraphNode*>& Visited)
+{
+	if (!OutputPin) return false;
+	for (const UEdGraphPin* Connected : OutputPin->LinkedTo)
+	{
+		if (!Connected) continue;
+		const UEdGraphNode* Node = Connected->GetOwningNode();
+		if (Visited.Contains(Node)) continue;
+		Visited.Add(Node);
+		if (Cast<UQuestlineNode_ExitBase>(Node)) return true;
+		if (const UQuestlineNode_Knot* Knot = Cast<UQuestlineNode_Knot>(Node))
+		{
+			if (HasDownstreamExit(Knot->FindPin(TEXT("KnotOut")), Visited))	return true;
+		}
+	}
+	return false;
+}
+
+// Returns true if OutputPin leads to TargetNode (directly or via reroutes).
+// Used to check whether a source quest node already has a path to a given exit node.
+static bool LeadsToNode(const UEdGraphPin* OutputPin, const UEdGraphNode* TargetNode, TSet<const UEdGraphNode*>& Visited)
+{
+	if (!OutputPin) return false;
+	for (const UEdGraphPin* ConnectedPin : OutputPin->LinkedTo)
+	{
+		if (!ConnectedPin) continue;
+		const UEdGraphNode* Node = ConnectedPin->GetOwningNode();
+		if (Node == TargetNode) return true;
+		if (Visited.Contains(Node)) continue;
+		Visited.Add(Node);
+		if (const UQuestlineNode_Knot* Knot = Cast<const UQuestlineNode_Knot>(Node))
+		{
+			if (LeadsToNode(Knot->FindPin(TEXT("KnotOut")), TargetNode, Visited)) return true;
+		}
+	}
+	return false;
+}
+
 class FQuestlineConnectionDrawingPolicy : public FConnectionDrawingPolicy
 {
 public:
-	FQuestlineConnectionDrawingPolicy(int32 InBackLayerID, int32 InFrontLayerID,
-		float InZoomFactor, const FSlateRect& InClippingRect,
+	FQuestlineConnectionDrawingPolicy(int32 InBackLayerID, int32 InFrontLayerID, float InZoomFactor, const FSlateRect& InClippingRect,
 		FSlateWindowElementList& InDrawElements, UEdGraph* InGraph)
-		: FConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements)
-		, GraphObj(InGraph)
+		: FConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements), GraphObj(InGraph)
 	{}
 
 	virtual void DetermineWiringStyle(UEdGraphPin* OutputPin, UEdGraphPin* InputPin, FConnectionParams& Params) override
 	{
 		FConnectionDrawingPolicy::DetermineWiringStyle(OutputPin, InputPin, Params);
 		if (OutputPin) Params.StartDirection = OutputPin->Direction;
-		if (InputPin)  Params.EndDirection   = InputPin->Direction;
+		if (InputPin) Params.EndDirection = InputPin->Direction;
+
+		Params.WireThickness = Settings->DefaultDataWireThickness;
 		ApplyQuestlineWireParams(OutputPin, InputPin, Params);
+
+		if (HoveredPins.Num() > 0)
+		{
+			ApplyHoverDeemphasis(OutputPin, InputPin, Params.WireThickness, Params.WireColor);
+		}
 	}
 
-	virtual void Draw(
-		TMap<TSharedRef<SWidget>, FArrangedWidget>& InPinGeometries,
-		FArrangedChildren& ArrangedNodes) override
+	virtual void Draw(TMap<TSharedRef<SWidget>, FArrangedWidget>& InPinGeometries, FArrangedChildren& ArrangedNodes) override
 	{
 		FConnectionDrawingPolicy::Draw(InPinGeometries, ArrangedNodes);
 	}
 
-	virtual void DrawConnection(
-		int32 LayerId, const FVector2f& Start, const FVector2f& End, const FConnectionParams& Params) override
-	{
-		// Dashes are the overlay's responsibility — skip them here so they aren't drawn twice
-		if (Params.bUserFlag1) return;
+	virtual void DrawConnection(int32 LayerId, const FVector2f& Start, const FVector2f& End, const FConnectionParams& Params) override
+	{		
+		const FVector2f SplineTangent = ComputeSplineTangent(Start, End);
+		const FVector2f P0Tangent = Params.StartTangent.IsNearlyZero()
+			? ((Params.StartDirection == EGPD_Output) ? SplineTangent : -SplineTangent)
+			: Params.StartTangent;
+		const FVector2f P1Tangent = Params.EndTangent.IsNearlyZero()
+			? ((Params.EndDirection == EGPD_Input) ? SplineTangent : -SplineTangent)
+			: Params.EndTangent;
+		
+		if (!Params.bUserFlag1)
+		{
+			FConnectionDrawingPolicy::DrawConnection(LayerId, Start, End, Params); // drawing + base hover pass
 
-		FConnectionDrawingPolicy::DrawConnection(LayerId, Start, End, Params);
+			// Unconditional second hover pass (mirrors EN's ENComputeClosestPoint approach)
+			const float ToleranceSq = FMath::Square(Settings->SplineHoverTolerance + Params.WireThickness * 0.5f);
+			float BestDistSq = FLT_MAX;
+			FVector2f BestPoint = FVector2f::ZeroVector;
+			constexpr int32 N = 16;
+			for (int32 i = 1; i <= N; ++i)
+			{
+				const FVector2f A = FMath::CubicInterp(Start, P0Tangent, End, P1Tangent, (float)(i-1)/N);
+				const FVector2f B = FMath::CubicInterp(Start, P0Tangent, End, P1Tangent, (float)i/N);
+				const FVector2f Closest = FMath::ClosestPointOnSegment2D(LocalMousePosition, A, B);
+				const float DistSq = (LocalMousePosition - Closest).SizeSquared();
+				if (DistSq < BestDistSq) { BestDistSq = DistSq; BestPoint = Closest; }
+			}
+			if (BestDistSq < ToleranceSq && BestDistSq < SplineOverlapResult.GetDistanceSquared())
+			{
+				const float D1 = Params.AssociatedPin1 ? (Start - BestPoint).SizeSquared() : FLT_MAX;
+				const float D2 = Params.AssociatedPin2 ? (End   - BestPoint).SizeSquared() : FLT_MAX;
+				SplineOverlapResult = FGraphSplineOverlapResult(Params.AssociatedPin1, Params.AssociatedPin2,
+					BestDistSq, D1, D2, true);
+			}
+			return;
+		}
+
+		constexpr int32 NumSamples = 64;
+		constexpr float DashLength = 10.f;
+		constexpr float GapLength = 5.f;
+
+		TArray<FVector2f> CurvePoints;
+		CurvePoints.Reserve(NumSamples + 1);
+		for (int32 i = 0; i <= NumSamples; ++i)
+		{
+			CurvePoints.Add(FMath::CubicInterp(Start, P0Tangent, End, P1Tangent, static_cast<float>(i) / NumSamples));
+		}
+		float Accumulated = 0.f;
+		bool bDashing = true;
+		TArray<FVector2f> CurrentDash;
+		CurrentDash.Add(CurvePoints[0]);
+
+		for (int32 i = 1; i < CurvePoints.Num(); ++i)
+		{
+			const FVector2f& A = CurvePoints[i - 1];
+			const FVector2f& B = CurvePoints[i];
+			const float SegLength = FVector2f::Distance(A, B);
+			if (SegLength < KINDA_SMALL_NUMBER) continue;
+
+			const FVector2f Dir = (B - A) / SegLength;
+			float Consumed = 0.f;
+
+			while (Consumed < SegLength)
+			{
+				const float Threshold = bDashing ? DashLength : GapLength;
+				const float ToThreshold = Threshold - Accumulated;
+				const float Available = SegLength - Consumed;
+
+				if (Available < ToThreshold)
+				{
+					if (bDashing) CurrentDash.Add(B);
+					Accumulated += Available;
+					break;
+				}
+
+				const FVector2f Transition = A + Dir * (Consumed + ToThreshold);
+				if (bDashing)
+				{
+					CurrentDash.Add(Transition);
+					if (CurrentDash.Num() >= 2)
+					{
+						FSlateDrawElement::MakeLines(DrawElementsList, LayerId, FPaintGeometry(), CurrentDash,
+							ESlateDrawEffect::None, Params.WireColor, true, Params.WireThickness);
+					}
+					CurrentDash.Reset();
+				}
+
+				Consumed += ToThreshold;
+				Accumulated = 0.f;
+				bDashing = !bDashing;
+				if (bDashing) CurrentDash.Add(A + Dir * Consumed);
+			}
+		}
+		
+		if (bDashing && CurrentDash.Num() >= 2)
+		{
+			FSlateDrawElement::MakeLines(DrawElementsList, LayerId, FPaintGeometry(), CurrentDash, ESlateDrawEffect::None,
+				Params.WireColor, true, Params.WireThickness);
+		}
+
+		const float ToleranceSq = FMath::Square(Settings->SplineHoverTolerance + Params.WireThickness * 0.5f);
+
+		float BestDistSq = FLT_MAX;
+		FVector2f BestPoint  = FVector2f::ZeroVector;
+
+		for (int32 i = 1; i < CurvePoints.Num(); ++i)
+		{
+			const FVector2f Closest = FMath::ClosestPointOnSegment2D(LocalMousePosition, CurvePoints[i - 1], CurvePoints[i]);
+			const float DistSq = (LocalMousePosition - Closest).SizeSquared();
+			if (DistSq < BestDistSq)
+			{
+				BestDistSq = DistSq;
+				BestPoint = Closest;
+			}
+		}
+
+		if (BestDistSq < ToleranceSq && BestDistSq < SplineOverlapResult.GetDistanceSquared())
+		{
+			const float DistToPin1Sq = Params.AssociatedPin1 ? (Start - BestPoint).SizeSquared() : FLT_MAX;
+			const float DistToPin2Sq = Params.AssociatedPin2 ? (End - BestPoint).SizeSquared() : FLT_MAX;
+			SplineOverlapResult = FGraphSplineOverlapResult(Params.AssociatedPin1, Params.AssociatedPin2,
+				BestDistSq, DistToPin1Sq, DistToPin2Sq, false);
+		}
 	}
 	
-	/*
-void FQuestlineConnectionDrawingPolicy::DrawConnection(int32 LayerId, const FVector2f& Start, const FVector2f& End, const FConnectionParams& Params)
-{
-    // Solid wires: delegate entirely to the base class.
-    // This allows Electronic Nodes (and other plugins) to inject their own rendering.
-    if (!Params.bUserFlag1)
-    {
-        Super::DrawConnection(LayerId, Start, End, Params);
-        return;
-    }
-
-    // Dashed prerequisite wires must be rendered manually to produce dashes.
-    // Use ComputeSplineTangent (virtual — Electronic Nodes can override it) and
-    // Params.StartDirection/EndDirection (set by Super::DetermineWiringStyle) so
-    // the curve shape stays consistent with whatever solid wires look like.
-    const FVector2f SplineTangent = ComputeSplineTangent(Start, End);
-    const FVector2f P0Tangent = (Params.StartDirection == EGPD_Output) ?  SplineTangent : -SplineTangent;
-    const FVector2f P1Tangent = (Params.EndDirection   == EGPD_Input)  ? -SplineTangent :  SplineTangent;
-
-    // Sample the bezier into discrete points for dash segment drawing
-    const int32 NumSamples = 64;
-    TArray<FVector2f> CurvePoints;
-    CurvePoints.Reserve(NumSamples + 1);
-    for (int32 i = 0; i <= NumSamples; ++i)
-    {
-        const float T = static_cast<float>(i) / static_cast<float>(NumSamples);
-        CurvePoints.Add(FMath::CubicInterp(Start, P0Tangent, End, P1Tangent, T));
-    }
-
-    const float DashLength = 10.f;
-    const float GapLength  =  5.f;
-
-    float Accumulated = 0.f;
-    bool bDrawing = true;
-    TArray<FVector2f> CurrentDash;
-    CurrentDash.Add(CurvePoints[0]);
-
-    for (int32 i = 1; i < CurvePoints.Num(); ++i)
-    {
-        const FVector2f& A = CurvePoints[i - 1];
-        const FVector2f& B = CurvePoints[i];
-        const float SegLength = FVector2f::Distance(A, B);
-        if (SegLength < KINDA_SMALL_NUMBER) continue;
-
-        const FVector2f SegDir = (B - A) / SegLength;
-        float Consumed = 0.f;
-
-        while (Consumed < SegLength)
-        {
-            const float Threshold   = bDrawing ? DashLength : GapLength;
-            const float ToThreshold = Threshold - Accumulated;
-            const float Available   = SegLength - Consumed;
-
-            if (Available < ToThreshold)
-            {
-                if (bDrawing) CurrentDash.Add(B);
-                Accumulated += Available;
-                break;
-            }
-
-            const FVector2f TransitionPoint = A + SegDir * (Consumed + ToThreshold);
-            if (bDrawing)
-            {
-                CurrentDash.Add(TransitionPoint);
-                if (CurrentDash.Num() >= 2)
-                {
-                    FSlateDrawElement::MakeLines(DrawElementsList, LayerId,
-                        FPaintGeometry(), CurrentDash, ESlateDrawEffect::None,
-                        Params.WireColor, true, Params.WireThickness);
-                }
-                CurrentDash.Reset();
-            }
-
-            Consumed    += ToThreshold;
-            Accumulated  = 0.f;
-            bDrawing     = !bDrawing;
-            if (bDrawing) CurrentDash.Add(A + SegDir * Consumed);
-        }
-    }
-
-    if (bDrawing && CurrentDash.Num() >= 2)
-    {
-        FSlateDrawElement::MakeLines(DrawElementsList, LayerId,
-            FPaintGeometry(), CurrentDash, ESlateDrawEffect::None,
-            Params.WireColor, true, Params.WireThickness);
-    }
-}
-*/
-
+	virtual void DrawPreviewConnector(const FGeometry& PinGeometry,	const FVector2f& StartPoint, const FVector2f& EndPoint,	UEdGraphPin* Pin) override
+	{
+		UQuestlineGraphSchema::SetActiveDragFromPin(Pin);
+		FConnectionDrawingPolicy::DrawPreviewConnector(PinGeometry, StartPoint, EndPoint, Pin);
+	}
+	
 private:
 	UEdGraph* GraphObj;
-};
-
-/**
- * Custom dashed line policy. Used in a second pass on graph to allow wire management plugins like Electronic Nodes to function
- * without destroying dashed prerequisite wires.
- */
-class FQuestlineDashOverlayPolicy : public FConnectionDrawingPolicy
-{
-    FConnectionDrawingPolicy* InnerPolicy;
-
-public:
-    FQuestlineDashOverlayPolicy(
-        FConnectionDrawingPolicy* InInnerPolicy,
-        int32 InBackLayerID, int32 InFrontLayerID,
-        float InZoomFactor, const FSlateRect& InClippingRect,
-        FSlateWindowElementList& InDrawElements)
-        : FConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements)
-        , InnerPolicy(InInnerPolicy)
-    {}
-
-    virtual ~FQuestlineDashOverlayPolicy() override
-    {
-        delete InnerPolicy;
-    }
-		
-	virtual void Draw(
-		TMap<TSharedRef<SWidget>, FArrangedWidget>& InPinGeometries,
-		FArrangedChildren& ArrangedNodes) override
-    {
-    	// Pass 1: inner policy draws everything (angular + dashes if EN active)
-    	InnerPolicy->Draw(InPinGeometries, ArrangedNodes);
-
-    	// Pass 2: only needed when EN is NOT active (inner is plain FQuestlineConnectionDrawingPolicy)
-    	// When GENPolicyFactory is set, pass 1 already handled prereq dashes via DrawWireSegment.
-    	if (!UQuestlineGraphSchema::IsENPolicyFactoryActive())
-    		FConnectionDrawingPolicy::Draw(InPinGeometries, ArrangedNodes);
-    }
-		
-    virtual void DetermineWiringStyle(
-        UEdGraphPin* OutputPin, UEdGraphPin* InputPin, FConnectionParams& Params) override
-    {
-        FConnectionDrawingPolicy::DetermineWiringStyle(OutputPin, InputPin, Params);
-        if (OutputPin) Params.StartDirection = OutputPin->Direction;
-        if (InputPin)  Params.EndDirection   = InputPin->Direction;
-        ApplyQuestlineWireParams(OutputPin, InputPin, Params);
-    }
-
-    virtual void DrawConnection(
-        int32 LayerId, const FVector2f& Start, const FVector2f& End,
-        const FConnectionParams& Params) override
-    {
-        // Solid wires were already drawn by the inner policy — skip them
-        if (!Params.bUserFlag1) return;
-
-        // Dashed prerequisite wire
-        const bool  bGoingForward  = (End.X >= Start.X);
-        const float ClampedTension = FMath::Clamp(FMath::Abs(End.X - Start.X), 30.f, 500.f);
-        const FVector2f P0Tangent(bGoingForward ?  ClampedTension : -ClampedTension, 0.f);
-        const FVector2f P1Tangent(bGoingForward ? -ClampedTension :  ClampedTension, 0.f);
-
-        const int32 NumSamples = 64;
-        TArray<FVector2f> CurvePoints;
-        CurvePoints.Reserve(NumSamples + 1);
-        for (int32 i = 0; i <= NumSamples; ++i)
-        {
-            const float T = static_cast<float>(i) / static_cast<float>(NumSamples);
-            CurvePoints.Add(FMath::CubicInterp(Start, P0Tangent, End, P1Tangent, T));
-        }
-
-        const float DashLength = 10.f;
-        const float GapLength  =  5.f;
-
-        float Accumulated = 0.f;
-        bool bDrawing = true;
-        TArray<FVector2f> CurrentDash;
-        CurrentDash.Add(CurvePoints[0]);
-
-        for (int32 i = 1; i < CurvePoints.Num(); ++i)
-        {
-            const FVector2f& A = CurvePoints[i - 1];
-            const FVector2f& B = CurvePoints[i];
-            const float SegLength = FVector2f::Distance(A, B);
-            if (SegLength < KINDA_SMALL_NUMBER) continue;
-
-            const FVector2f SegDir = (B - A) / SegLength;
-            float Consumed = 0.f;
-
-            while (Consumed < SegLength)
-            {
-                const float Threshold   = bDrawing ? DashLength : GapLength;
-                const float ToThreshold = Threshold - Accumulated;
-                const float Available   = SegLength - Consumed;
-
-                if (Available < ToThreshold)
-                {
-                    if (bDrawing) CurrentDash.Add(B);
-                    Accumulated += Available;
-                    break;
-                }
-
-                const FVector2f TransitionPoint = A + SegDir * (Consumed + ToThreshold);
-                if (bDrawing)
-                {
-                    CurrentDash.Add(TransitionPoint);
-                    if (CurrentDash.Num() >= 2)
-                    {
-                        FSlateDrawElement::MakeLines(DrawElementsList, LayerId,
-                            FPaintGeometry(), CurrentDash, ESlateDrawEffect::None,
-                            Params.WireColor, true, Params.WireThickness);
-                    }
-                    CurrentDash.Reset();
-                }
-
-                Consumed    += ToThreshold;
-                Accumulated  = 0.f;
-                bDrawing     = !bDrawing;
-                if (bDrawing) CurrentDash.Add(A + SegDir * Consumed);
-            }
-        }
-
-        if (bDrawing && CurrentDash.Num() >= 2)
-        {
-            FSlateDrawElement::MakeLines(DrawElementsList, LayerId,
-                FPaintGeometry(), CurrentDash, ESlateDrawEffect::None,
-                Params.WireColor, true, Params.WireThickness);
-        }
-    }
 };
 
 class FQuestlineConnectionFactory : public FGraphPanelPinConnectionFactory
@@ -304,19 +253,10 @@ public:
 			return nullptr;
 
 		bInProgress = true;
-
-		// Ask every registered factory (including EN) for a policy.
-		// Our factory returns nullptr above, so EN gets to run unobstructed.
-		FConnectionDrawingPolicy* InnerPolicy = FNodeFactory::CreateConnectionPolicy(
-			Schema, InBackLayerID, InFrontLayerID,
-			InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
-
+		FConnectionDrawingPolicy* Policy = FNodeFactory::CreateConnectionPolicy(
+			Schema, InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
 		bInProgress = false;
-
-		return new FQuestlineDashOverlayPolicy(
-			InnerPolicy,
-			InBackLayerID, InFrontLayerID,
-			InZoomFactor, InClippingRect, InDrawElements);
+		return Policy;
 	}
 };
 
@@ -404,6 +344,23 @@ void UQuestlineGraphSchema::CollectSourceQuests(const UEdGraphPin* Pin, TSet<UQu
 	}
 }
 
+void UQuestlineGraphSchema::CollectDownstreamTerminalInputs(const UEdGraphPin* KnotOutPin, TArray<const UEdGraphPin*>& OutTerminalPins,
+	TSet<const UEdGraphNode*>& Visited)
+{
+	if (!KnotOutPin) return;
+	for (const UEdGraphPin* Connected : KnotOutPin->LinkedTo)
+	{
+		if (!Connected) continue;
+		const UEdGraphNode* Node = Connected->GetOwningNode();
+		if (Visited.Contains(Node)) continue;
+		Visited.Add(Node);
+		if (const UQuestlineNode_Knot* NextKnot = Cast<const UQuestlineNode_Knot>(Node))
+			CollectDownstreamTerminalInputs(NextKnot->FindPin(TEXT("KnotOut")), OutTerminalPins, Visited);
+		else
+			OutTerminalPins.Add(Connected);
+	}
+}
+
 const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const
 {
 	if (!A || !B)
@@ -425,6 +382,41 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 	const bool bOutputIsKnot = Cast<const UQuestlineNode_Knot>(OutputNode) != nullptr;
 	const bool bInputIsKnot  = Cast<const UQuestlineNode_Knot>(InputNode)  != nullptr;
 
+	// Exit Node enforcement
+	if (Cast<UQuestlineNode_ExitBase>(InputNode))
+	{
+		// Exit Rule 1: a quest node may not have more than one output pin leading to the same exit node — trace back to all
+		// source quests and check their other outputs for an existing path to this exit
+		TSet<UQuestlineNode_Quest*> QuestSources;
+		{
+			TSet<const UEdGraphNode*> Visited;
+			CollectSourceQuests(OutputPin, QuestSources, Visited);
+		}
+		for (UQuestlineNode_Quest* QuestSourceNode : QuestSources)
+		{
+			for (UEdGraphPin* SourcePin : QuestSourceNode->Pins)
+			{
+				if (SourcePin->Direction != EGPD_Output) continue;
+				TSet<const UEdGraphNode*> Visited;
+				if (LeadsToNode(SourcePin, InputNode, Visited))
+				{
+					return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, NSLOCTEXT("SimpleQuestEditor", "QuestAlreadyToExit",
+						"A quest node in the intended connection is already connected to this Questline end node."));
+				}
+			}
+		}
+		// Rule 2: the output pin being connected may not already lead to any exit node — one output pin maps to at most one exit node
+		{
+			TSet<const UEdGraphNode*> Visited;
+			if (HasDownstreamExit(OutputPin, Visited))
+			{
+				return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, NSLOCTEXT("SimpleQuestEditor", "OutputAlreadyLeadsToExit",
+					"A Quest on this wire already leads to a Questline end node. Each outcome can only trigger one ending."));
+			}
+		}
+	}
+	
+	// Lambda for checking upstream connections
 	auto CheckDuplicateSources = [&]() -> FPinConnectionResponse
 	{
 		TSet<UQuestlineNode_Quest*> IncomingSources;
@@ -460,10 +452,49 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 		return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, FText::GetEmpty());
 	};
 
+	// Lambda for checking downstream connections
+	auto CheckDownstreamParallelPaths = [&](const UEdGraphPin* KnotInputPin) -> FPinConnectionResponse
+	{
+		TSet<UQuestlineNode_Quest*> IncomingSources;
+		{
+			TSet<const UEdGraphNode*> Visited;
+			CollectSourceQuests(OutputPin, IncomingSources, Visited);
+		}
+		if (IncomingSources.Num() == 0)
+			return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, FText::GetEmpty());
+
+		const UQuestlineNode_Knot* InputKnot = Cast<const UQuestlineNode_Knot>(KnotInputPin->GetOwningNode());
+		TArray<const UEdGraphPin*> DownstreamTerminals;
+		{
+			TSet<const UEdGraphNode*> Visited;
+			Visited.Add(KnotInputPin->GetOwningNode());
+			CollectDownstreamTerminalInputs(InputKnot->FindPin(TEXT("KnotOut")), DownstreamTerminals, Visited);
+		}
+		for (const UEdGraphPin* Terminal : DownstreamTerminals)
+		{
+			for (const UEdGraphPin* Existing : Terminal->LinkedTo)
+			{
+				TSet<UQuestlineNode_Quest*> ExistingSources;
+				TSet<const UEdGraphNode*> Visited;
+				CollectSourceQuests(Existing, ExistingSources, Visited);
+				if (IncomingSources.Intersect(ExistingSources).Num() > 0)
+				{
+					return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
+						NSLOCTEXT("SimpleQuestEditor", "DuplicatePathViaReroute",
+							"This would create a parallel path to a destination node via another connection."));
+				}
+			}
+		}
+		return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, FText::GetEmpty());
+	};
+
+	// Either the input or the output pin is a knot (reroute node) 
 	if (bOutputIsKnot || bInputIsKnot)
 	{
+		// Both are knots
 		if (bOutputIsKnot && bInputIsKnot)
 		{
+			// It's the same knot 
 			if (OutputNode == InputNode)
 			{
 				return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
@@ -482,7 +513,8 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 						NSLOCTEXT("SimpleQuestEditor", "KnotTypeMismatch", "Reroute node signal types do not match"));
 				}
 			}
-			return CheckDuplicateSources();
+			if (const FPinConnectionResponse R = CheckDuplicateSources(); R.Response != CONNECT_RESPONSE_MAKE) return R;
+			return CheckDownstreamParallelPaths(InputPin);
 		}
 
 		if (bInputIsKnot)
@@ -499,7 +531,8 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 						NSLOCTEXT("SimpleQuestEditor", "KnotTypeMismatch", "Signal type does not match this reroute node"));
 				}
 			}
-			return CheckDuplicateSources();
+			if (const FPinConnectionResponse R = CheckDuplicateSources(); R.Response != CONNECT_RESPONSE_MAKE) return R;
+			return CheckDownstreamParallelPaths(InputPin);
 		}
 
 		// bOutputIsKnot, non-knot destination — fall through to duplicate check
@@ -671,7 +704,7 @@ bool UQuestlineGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) 
 
 // File-local storage — never crosses DLL boundaries
 static TFunction<FConnectionDrawingPolicy*(int32, int32, float, const FSlateRect&, FSlateWindowElementList&, UEdGraph*)>
-	GENPolicyFactory;
+	GENPolicyFactory = nullptr;
 
 void UQuestlineGraphSchema::RegisterENPolicyFactory(
 	TFunction<FConnectionDrawingPolicy*(int32, int32, float, const FSlateRect&, FSlateWindowElementList&, UEdGraph*)> Factory)
@@ -689,17 +722,46 @@ bool UQuestlineGraphSchema::IsENPolicyFactoryActive()
 	return static_cast<bool>(GENPolicyFactory);
 }
 
-FConnectionDrawingPolicy* UQuestlineGraphSchema::CreateConnectionDrawingPolicy(
-	int32 InBackLayerID, int32 InFrontLayerID, float InZoomFactor,
-	const FSlateRect& InClippingRect, FSlateWindowElementList& InDrawElements,
-	UEdGraph* InGraphObj) const
+static TWeakObjectPtr<UEdGraphNode> GActiveDragFromNode;
+static FName GActiveDragFromPinName;
+
+void UQuestlineGraphSchema::SetActiveDragFromPin(UEdGraphPin* Pin)
 {
+	if (Pin)
+	{
+		GActiveDragFromNode = Pin->GetOwningNode();
+		GActiveDragFromPinName = Pin->PinName;
+	}
+	else
+	{
+		GActiveDragFromNode = nullptr;
+		GActiveDragFromPinName = NAME_None;
+	}
+}
 
-	if (GENPolicyFactory)
-		return GENPolicyFactory(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
+UEdGraphPin* UQuestlineGraphSchema::GetActiveDragFromPin()
+{
+	if (UEdGraphNode* Node = GActiveDragFromNode.Get())
+		return Node->FindPin(GActiveDragFromPinName);
+	return nullptr;
+}
 
-	return new FQuestlineConnectionDrawingPolicy(
-		InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
+void UQuestlineGraphSchema::ClearActiveDragFromPin()
+{
+	GActiveDragFromNode = nullptr;
+	GActiveDragFromPinName = NAME_None;
+}
+
+FConnectionDrawingPolicy* UQuestlineGraphSchema::CreateConnectionDrawingPolicy(int32 InBackLayerID, int32 InFrontLayerID,
+	float InZoomFactor, const FSlateRect& InClippingRect, FSlateWindowElementList& InDrawElements, UEdGraph* InGraphObj) const
+{
+	if (GENPolicyFactory != nullptr)
+	{
+		if (FConnectionDrawingPolicy* Policy = GENPolicyFactory(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj))
+			return Policy;
+	}
+
+	return new FQuestlineConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
 }
 
 

@@ -4,8 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
-#include "GraphEditor.h"
-#include "GraphEditorActions.h"
+#include "Toolkit/QuestlineGraphPanel.h"
 
 class UQuestlineGraph;
 class SGraphEditor;
@@ -25,13 +24,12 @@ public:
 
 private:
 	TSharedRef<SDockTab> SpawnGraphViewportTab(const FSpawnTabArgs& Args);
-	TSharedRef<SGraphEditor> CreateGraphEditorWidget();
+	TSharedRef<SQuestlineGraphPanel> CreateGraphEditorWidget();
 	void BindGraphCommands();
 	void DeleteSelectedNodes();
 
 	TObjectPtr<UQuestlineGraph> QuestlineGraph;
-	TSharedPtr<SGraphEditor> GraphEditorWidget;
+	TSharedPtr<SQuestlineGraphPanel> GraphEditorWidget;
 	TSharedPtr<FUICommandList> GraphEditorCommands;
-	
 	static const FName GraphViewportTabId;
 };

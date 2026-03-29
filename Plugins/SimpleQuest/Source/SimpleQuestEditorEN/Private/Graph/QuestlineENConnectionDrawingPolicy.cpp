@@ -129,15 +129,14 @@ void FQuestlineENConnectionDrawingPolicy::DrawArcSegment(
     FVector2f Prev = Start;
     for (int32 i = 1; i <= NumSubdivisions; ++i)
     {
-        const float     T     = static_cast<float>(i) / static_cast<float>(NumSubdivisions);
+        const float T = static_cast<float>(i) / static_cast<float>(NumSubdivisions);
         const FVector2f Point = FMath::CubicInterp(Start, StartTangent, End, EndTangent, T);
         DrawWireSegment(Prev, Point, LayerId, Color, Thickness);
         Prev = Point;
     }
 }
 
-bool FQuestlineENConnectionDrawingPolicy::ShouldConnectionUseRibbonOffset(float RibbonMin, float RibbonMax,
-    float CurrentMin, float CurrentMax)
+bool FQuestlineENConnectionDrawingPolicy::IsIdenticalRibbonSegment(float RibbonMin, float RibbonMax, float CurrentMin, float CurrentMax)
 {
     return  (FMath::IsNearlyEqual(RibbonMin, CurrentMin, KINDA_SMALL_NUMBER) && FMath::IsNearlyEqual(RibbonMax, CurrentMax, KINDA_SMALL_NUMBER)) ||
             (FMath::IsNearlyEqual(RibbonMin, CurrentMax, KINDA_SMALL_NUMBER) && FMath::IsNearlyEqual(RibbonMax, CurrentMin, KINDA_SMALL_NUMBER));

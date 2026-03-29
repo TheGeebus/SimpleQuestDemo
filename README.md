@@ -23,7 +23,7 @@ This version is for Unreal Engine 5.6.
 
 ## Requirements
 
-- Unreal Engine 5.4 or later
+- Unreal Engine 5.6 or later
 - Visual Studio 2022 (Windows) or Xcode (Mac) with C++20 support enabled
 
 ---
@@ -40,6 +40,7 @@ To use SimpleQuest as a source dependency in another plugin, add `"SimpleQuest"`
 ---
 
 ## Quick Start
+_(Soon to be replaced with visual graph questline authoring)_
 
 ### 1. Create a Quest asset
 

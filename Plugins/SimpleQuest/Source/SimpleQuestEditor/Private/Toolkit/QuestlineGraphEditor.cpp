@@ -1,8 +1,10 @@
 ﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #include "Toolkit/QuestlineGraphEditor.h"
+#include "Toolkit/QuestlineGraphPanel.h"
 #include "Quests/QuestlineGraph.h"
 #include "GraphEditor.h"
+#include "GraphEditorActions.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/Commands/GenericCommands.h"
@@ -89,15 +91,12 @@ TSharedRef<SDockTab> FQuestlineGraphEditor::SpawnGraphViewportTab(const FSpawnTa
         ];
 }
 
-TSharedRef<SGraphEditor> FQuestlineGraphEditor::CreateGraphEditorWidget()
+TSharedRef<SQuestlineGraphPanel> FQuestlineGraphEditor::CreateGraphEditorWidget()
 {
     check(QuestlineGraph);
     check(QuestlineGraph->QuestlineEdGraph);
 
-    return SNew(SGraphEditor)
-        .IsEditable(true)
-        .GraphToEdit(QuestlineGraph->QuestlineEdGraph)
-        .AdditionalCommands(GraphEditorCommands);
+    return SNew(SQuestlineGraphPanel, QuestlineGraph->QuestlineEdGraph, GraphEditorCommands);
 }
 
 void FQuestlineGraphEditor::BindGraphCommands()
@@ -119,7 +118,7 @@ void FQuestlineGraphEditor::DeleteSelectedNodes()
 
     QuestlineGraph->QuestlineEdGraph->Modify();
 
-    for (UObject* Obj : GraphEditorWidget->GetSelectedNodes())
+    for (UObject* Obj : GraphEditorWidget->GetGraphEditor()->GetSelectedNodes())
     {
         UEdGraphNode* Node = Cast<UEdGraphNode>(Obj);
         if (Node && Node->CanUserDeleteNode())

@@ -15,17 +15,11 @@ public:
         const FSlateRect& InClippingRect,
         FSlateWindowElementList& InDrawElements, UEdGraph* InGraphObj);
 
-    virtual void DetermineWiringStyle(
-        UEdGraphPin* OutputPin, UEdGraphPin* InputPin,
-        FConnectionParams& Params) override;
-
-    virtual void DrawConnection(
-        int32 LayerId, const FVector2f& Start, const FVector2f& End,
-        const FConnectionParams& Params) override;
-
+    virtual void DetermineWiringStyle(UEdGraphPin* OutputPin, UEdGraphPin* InputPin, FConnectionParams& Params) override;
+    virtual void DrawConnection(int32 LayerId, const FVector2f& Start, const FVector2f& End, const FConnectionParams& Params) override;
     virtual void DrawWireSegment(const FVector2f& Start, const FVector2f& End,	int32 LayerId, const FLinearColor& Color, float Thickness) override;
     virtual void DrawArcSegment(const FVector2f& Start, const FVector2f& StartTangent, const FVector2f& End, const FVector2f& EndTangent, int32 LayerId, const FLinearColor& Color, float Thickness) override;
-    virtual bool ShouldConnectionUseRibbonOffset(float RibbonMin, float RibbonMax, float CurrentMin, float CurrentMax) override;
+    virtual bool IsIdenticalRibbonSegment(float RibbonMin, float RibbonMax, float CurrentMin, float CurrentMax) override;
     
 private:
     // Dash state — reset per connection in DrawConnection

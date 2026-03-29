@@ -17,7 +17,8 @@ public class SimpleQuestEditor: ModuleRules
 			"AssetTools", 
 			"GraphEditor",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
+			"InputCore",
 		});
 
 		if (Target.bBuildEditor)
