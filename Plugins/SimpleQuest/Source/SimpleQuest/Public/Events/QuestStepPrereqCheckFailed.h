@@ -13,8 +13,8 @@ struct FQuestStepPrereqCheckFailed : public FQuestPrerequisiteCheckFailed
 	
 	FQuestStepPrereqCheckFailed() = default;
 
-	FQuestStepPrereqCheckFailed(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass, const int32 InQuestStepID)
-		: FQuestPrerequisiteCheckFailed(InQuestID, InQuestClass), QuestStepID(InQuestStepID) {}
+	FQuestStepPrereqCheckFailed(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass, const int32 InQuestStepID)
+		: FQuestPrerequisiteCheckFailed(InQuestTag, InQuestClass), QuestStepID(InQuestStepID) {}
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 QuestStepID = -1;	

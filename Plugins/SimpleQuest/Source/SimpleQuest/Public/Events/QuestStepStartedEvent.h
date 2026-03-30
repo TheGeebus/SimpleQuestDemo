@@ -11,8 +11,8 @@ struct FQuestStepStartedEvent : public FQuestEventBase
 	
 	FQuestStepStartedEvent() = default;
 
-	FQuestStepStartedEvent(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass, const int32 InStepID)
-		: FQuestEventBase(InQuestID, InQuestClass), StepID(InStepID) {}
+	FQuestStepStartedEvent(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass, const int32 InStepID)
+		: FQuestEventBase(InQuestTag, InQuestClass), StepID(InStepID) {}
 
 	UPROPERTY(BlueprintReadWrite)
 	int32 StepID = -1;

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphNode.h"
+#include "Misc/Guid.h"
 #include "QuestlineNode_Quest.generated.h"
 
 class UQuest;
@@ -27,4 +28,12 @@ public:
 	// Display name set by the designer in the graph
 	UPROPERTY(EditAnywhere, Category = "Quest")
 	FText NodeLabel;
+
+	// Stable identity for this node. Used to derive QuestID at compile time. Generated once on placement and regenerated
+	// on duplication — never hand-edited.
+	UPROPERTY(VisibleAnywhere, Category = "Quest")
+	FGuid QuestGuid;
+
+	virtual void PostPlacedNewNode() override;
+	virtual void PostDuplicate(bool bDuplicateForPIE) override;
 };

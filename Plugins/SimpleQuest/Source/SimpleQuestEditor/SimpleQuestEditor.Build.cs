@@ -1,4 +1,6 @@
-﻿using UnrealBuildTool;
+﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
+
+using UnrealBuildTool;
 
 public class SimpleQuestEditor: ModuleRules
 {
@@ -19,6 +21,7 @@ public class SimpleQuestEditor: ModuleRules
 			"Slate",
 			"SlateCore",
 			"InputCore",
+			"BlueprintGraph",
 		});
 
 		if (Target.bBuildEditor)

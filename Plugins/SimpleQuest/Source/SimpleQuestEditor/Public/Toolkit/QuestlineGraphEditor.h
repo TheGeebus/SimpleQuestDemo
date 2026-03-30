@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
 #include "Toolkit/QuestlineGraphPanel.h"
+#include "ISimpleQuestEditorModule.h"
+
 
 class UQuestlineGraph;
 class SGraphEditor;
@@ -27,6 +29,12 @@ private:
 	TSharedRef<SQuestlineGraphPanel> CreateGraphEditorWidget();
 	void BindGraphCommands();
 	void DeleteSelectedNodes();
+
+	// Compile and save graph data layer
+	void CompileQuestlineGraph();
+	virtual void SaveAsset_Execute() override;
+	void ExtendToolbar();
+	void FillToolbar(FToolBarBuilder& ToolbarBuilder);
 
 	TObjectPtr<UQuestlineGraph> QuestlineGraph;
 	TSharedPtr<SQuestlineGraphPanel> GraphEditorWidget;

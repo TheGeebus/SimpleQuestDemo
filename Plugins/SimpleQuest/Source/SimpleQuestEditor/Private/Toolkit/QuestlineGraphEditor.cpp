@@ -5,17 +5,18 @@
 #include "Quests/QuestlineGraph.h"
 #include "GraphEditor.h"
 #include "GraphEditorActions.h"
+#include "QuestlineGraphCompiler.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/Commands/GenericCommands.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Toolkit/QuestlineGraphEditorCommands.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 
 const FName FQuestlineGraphEditor::GraphViewportTabId(TEXT("QuestlineGraphEditor_GraphViewport"));
 
-void FQuestlineGraphEditor::InitQuestlineGraphEditor(
-    const EToolkitMode::Type Mode,
-    const TSharedPtr<IToolkitHost>& InitToolkitHost,
-    UQuestlineGraph* InQuestlineGraph)
+void FQuestlineGraphEditor::InitQuestlineGraphEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UQuestlineGraph* InQuestlineGraph)
 {
     QuestlineGraph = InQuestlineGraph;
 
@@ -33,7 +34,7 @@ void FQuestlineGraphEditor::InitQuestlineGraphEditor(
         );
     
     BindGraphCommands();
-
+    ExtendToolbar();
     InitAssetEditor(
         Mode,
         InitToolkitHost,
@@ -128,4 +129,43 @@ void FQuestlineGraphEditor::DeleteSelectedNodes()
             QuestlineGraph->QuestlineEdGraph->RemoveNode(Node);
         }
     }
+}
+
+void FQuestlineGraphEditor::CompileQuestlineGraph()
+{
+    TUniquePtr<FQuestlineGraphCompiler> Compiler = ISimpleQuestEditorModule::Get().CreateCompiler();
+    const bool bSuccess = Compiler->Compile(QuestlineGraph);
+
+    const FText Notification = bSuccess
+        ? NSLOCTEXT("SimpleQuestEditor", "CompileSuccess", "Questline compiled successfully.")
+        : NSLOCTEXT("SimpleQuestEditor", "CompileFailed", "Questline compilation failed. Check the Output Log for details.");
+
+    FNotificationInfo Info(Notification);
+    Info.ExpireDuration = 3.f;
+    Info.bUseSuccessFailIcons = true;
+    FSlateNotificationManager::Get().AddNotification(Info)->SetCompletionState(bSuccess ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
+}
+
+void FQuestlineGraphEditor::SaveAsset_Execute()
+{
+    CompileQuestlineGraph();
+    FAssetEditorToolkit::SaveAsset_Execute();
+}
+
+void FQuestlineGraphEditor::ExtendToolbar()
+{
+    TSharedPtr<FExtender> ToolbarExtender = MakeShared<FExtender>();
+    ToolbarExtender->AddToolBarExtension(
+        "Asset",
+        EExtensionHook::After,
+        GraphEditorCommands,
+        FToolBarExtensionDelegate::CreateSP(this, &FQuestlineGraphEditor::FillToolbar));
+    AddToolbarExtender(ToolbarExtender);
+}
+
+void FQuestlineGraphEditor::FillToolbar(FToolBarBuilder& ToolbarBuilder)
+{
+    ToolbarBuilder.BeginSection("Compile");
+    ToolbarBuilder.AddToolBarButton(FQuestlineGraphEditorCommands::Get().CompileQuestlineGraph);
+    ToolbarBuilder.EndSection();
 }

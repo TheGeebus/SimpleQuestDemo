@@ -11,6 +11,6 @@ struct FQuestStartedEvent : public FQuestEventBase
 	
 	FQuestStartedEvent() = default;
 
-	explicit FQuestStartedEvent(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass)
-		: FQuestEventBase(InQuestID, InQuestClass) {}
+	explicit FQuestStartedEvent(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass)
+		: FQuestEventBase(InQuestTag, InQuestClass) {}
 };

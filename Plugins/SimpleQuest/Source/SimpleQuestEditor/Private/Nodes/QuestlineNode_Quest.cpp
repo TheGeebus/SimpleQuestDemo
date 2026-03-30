@@ -58,3 +58,15 @@ void UQuestlineNode_Quest::AutowireNewNode(UEdGraphPin* FromPin)
 	}
 }
 
+void UQuestlineNode_Quest::PostPlacedNewNode()
+{
+	Super::PostPlacedNewNode();
+	QuestGuid = FGuid::NewGuid();
+}
+
+void UQuestlineNode_Quest::PostDuplicate(bool bDuplicateForPIE)
+{
+	Super::PostDuplicate(bDuplicateForPIE);
+	QuestGuid = FGuid::NewGuid();
+}
+

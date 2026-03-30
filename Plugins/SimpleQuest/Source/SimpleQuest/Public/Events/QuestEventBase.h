@@ -1,7 +1,6 @@
 #pragma once
 
 #include "SignalEventBase.h"
-
 #include "QuestEventBase.generated.h"
 
 class UQuest;
@@ -13,9 +12,12 @@ struct FQuestEventBase : public FSignalEventBase
 
 	FQuestEventBase() = default;
 
-	FQuestEventBase(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass)
-		: FSignalEventBase(InQuestID), QuestClass(InQuestClass) {}
+	FQuestEventBase(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass)
+		: FSignalEventBase(InQuestTag.GetTagName()), QuestClass(InQuestClass) {}
 	
 	UPROPERTY()
-	TSubclassOf<UQuest> QuestClass;	
+	TSubclassOf<UQuest> QuestClass;
+
+	UPROPERTY()
+	FGameplayTag QuestTag;
 };

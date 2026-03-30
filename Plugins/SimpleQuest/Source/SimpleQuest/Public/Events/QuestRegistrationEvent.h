@@ -11,8 +11,8 @@ struct FQuestRegistrationEvent : public FQuestEventBase
 
 	FQuestRegistrationEvent() = default;
 	
-	FQuestRegistrationEvent(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass, AActor* InOwningActor)
-		: FQuestEventBase(InQuestID, InQuestClass), OwningActor(InOwningActor) {}
+	FQuestRegistrationEvent(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass, AActor* InOwningActor)
+		: FQuestEventBase(InQuestTag, InQuestClass), OwningActor(InOwningActor) {}
 
 	UPROPERTY()
 	TObjectPtr<AActor> OwningActor;

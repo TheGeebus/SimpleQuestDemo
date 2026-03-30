@@ -35,13 +35,6 @@
 			"LoadingPhase": "PostDefault"
 		}
 	],
-	"Plugins": [
-		{
-			"Name": "ElectronicNodes",
-			"Enabled": true,
-			"Optional": true
-		}
-	],
 	"AdditionalPluginConfig": [
 		"SimpleQuest"
 	]

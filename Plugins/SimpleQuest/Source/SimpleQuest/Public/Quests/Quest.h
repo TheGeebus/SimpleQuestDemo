@@ -1,13 +1,14 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "QuestTypes.h"
+#include "GameplayTagContainer.h"
 #include "Quest.generated.h"
 
+class UQuest;
 class UQuestReward;
-//class UQuestSignalSubsystem;
 class UQuestObjective;
 
 /**
@@ -160,6 +161,40 @@ struct FQuestStep
 };
 
 /**
+ * Used to flag the required outcome of a given prerequisite quest that must be fulfilled before starting (but not activating)
+ * another quest 
+ */
+UENUM(BlueprintType)
+enum class EQuestPrerequisiteOutcome : uint8
+{
+	AnyOutcome UMETA(DisplayName = "Any Outcome"),
+	MustSucceed UMETA(DisplayName = "Must Succeed"),
+	MustFail UMETA(DisplayName = "Must Fail"),
+};
+
+/**
+ * A prerequisite quest for this quest and their require completion status that mst be attained before starting (but not activating)
+ * this quest. Contains both a quest class and a required outcome.
+ */
+USTRUCT(BlueprintType)
+struct FQuestPrerequisite
+{
+	GENERATED_BODY()
+
+	/**
+	 * The quest class that must be completed before this quest can begin.
+	 */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
+	TSoftClassPtr<UQuest> QuestClass;
+
+	/**
+	 * The required completion status (success, failure, any outcome). 
+	 */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
+	EQuestPrerequisiteOutcome RequiredOutcome = EQuestPrerequisiteOutcome::AnyOutcome;
+};
+
+/**
  * A quest is a set of linked goals - or FQuestSteps - that together create a single in-game mission. To create a
  * new quest, create a new child blueprint that inherits this base class. Quests can be triggered by calling the
  * StartQuest function on the UQuestManagerSubsystem class and passing the appropriate Quest class.
@@ -168,12 +203,11 @@ UCLASS(Blueprintable)
 class SIMPLEQUEST_API UQuest : public UObject
 {
 	GENERATED_BODY()
-protected:
-	virtual void PostInitProperties() override; 
-	
+
+	friend class FQuestlineGraphCompiler;
+
 public:
 	UQuest();
-		
 	void StartQuestStep(int32 InQuestStepID);
 	void CheckQuestTarget(UObject* InQuestTargetActor);
 	
@@ -199,23 +233,31 @@ public:
 	
 
 protected:
+	virtual void PostInitProperties() override; 
+	
 	/**
-	 * Stable quest identifier for save data and external systems. Defaults to class name if unset. Should be unique.
+	 * Stable identity for this quest, derived from the authoring node's QuestGuid at compile time. Used as the primary
+	 * key for save data. Never hand-edited.
 	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName QuestID;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite)
+	FGuid QuestGuid;
+	
+	/**
+	 * Hierarchical tag for this quest, generated at compile time from the questline asset name and the quest node's
+	 * label. Used for event bus routing and runtime queries.
+	 *
+	 * Format: Quest.<QuestlineName>.<SanitizedNodeLabel>
+	 */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
+	FGameplayTag QuestTag;
+	
 	/**
 	 * All of these quests must be completed prior to the start of this quest. If any quest in this set is not
 	 * completed when calling StartQuest, the quest will not be started.
 	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	TSet<TSoftClassPtr<UQuest>> PrerequisiteQuests = TSet<TSoftClassPtr<UQuest>>();
-	/**
-	 * Completed quests may end in either success or failure. By default, a quest completed with either status will fulfill
-	 * prerequisites. Enable this to additionally check for the success of all prerequisites before starting this quest.
-	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, AdvancedDisplay)
-	bool bPrerequisiteQuestsMustSucceed = false;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite)
+	TArray<FQuestPrerequisite> PrerequisiteQuests = TArray<FQuestPrerequisite>();
+
 	/**
 	 * An array of structs containing the data required to create a quest step. A quest step represents a discrete goal
 	 * that must be completed to advance the quest until either completion or failure. It also contains all the
@@ -224,6 +266,7 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)	
 	TArray<FQuestStep> QuestSteps;
+	
 	/**
 	 * By default, successful completion of the last step in the QuestSteps array will also complete the associated
 	 * quest. Disable this property if you do not want this behavior for this quest and instead want to explicitly
@@ -231,6 +274,7 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Completion, AdvancedDisplay)
 	bool bQuestAutoComplete = true;
+	
 	 /**
 	 * Whether this is the final quest in a questline. A questline may be considered a major plot section or act.
 	 * It may be accompanied by significant progression and/or rewards and may immediately precede a level change.
@@ -239,10 +283,16 @@ protected:
 	bool bCompletesQuestline = false;
 
 	/**
-	 * The next quests started on completion of this quest, if any.
+	 * The next quests started on successful completion of this quest, if any.
 	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Completion)
-	TSet<TSoftClassPtr<UQuest>> NextQuests;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = Completion)
+	TSet<TSoftClassPtr<UQuest>> NextQuestsOnSuccess;
+
+	/**
+	 * The next quests started following failure of this quest, if any.
+	 */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = Completion)
+	TSet<TSoftClassPtr<UQuest>> NextQuestsOnFailure;
 	
 	/**
 	 * Whether this quest has been completed. A quest's conditions may be fulfilled early. Setting this value will allow
@@ -296,18 +346,19 @@ protected:
 
 	UFUNCTION()
 	void OnObjectiveEnabledEvent(UObject* InTargetObject, int32 InStepID, bool bNewIsEnabled);
-
+/*
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
-
+*/
 	
 public:
-	FName GetQuestID() const;
-	const TSet<TSoftClassPtr<UQuest>>& GetPrerequisiteQuests() const { return PrerequisiteQuests; }
-	const TSet<TSoftClassPtr<UQuest>>& GetNextQuests() const { return NextQuests; }
+	FGuid GetQuestGuid() const { return QuestGuid; }
+	FGameplayTag GetQuestTag() const { return QuestTag; }
+	const TArray<FQuestPrerequisite>& GetPrerequisiteQuests() const { return PrerequisiteQuests; }
+	const TSet<TSoftClassPtr<UQuest>>& GetNextQuestsOnSuccess() const { return NextQuestsOnSuccess; }
+	const TSet<TSoftClassPtr<UQuest>>& GetNextQuestsOnFailure() const { return NextQuestsOnFailure; }
 	const TSet<TSoftClassPtr<UQuest>>& GetPrerequisitesToReset() const { return PrerequisitesToReset; }
 	const TSet<int32>& GetCurrentActiveSteps() const { return CurrentActiveSteps; }
 	bool DoesCompleteQuestline() const { return bCompletesQuestline; }
-	bool ShouldQuestPrerequisitesSucceed() const { return bPrerequisiteQuestsMustSucceed; }
 };

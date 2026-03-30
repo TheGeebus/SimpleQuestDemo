@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 
 #include "Components/QuestGiverComponent.h"
@@ -51,7 +51,7 @@ void UQuestGiverComponent::RegisterQuestGiver()
 
 void UQuestGiverComponent::RegisterForQuestClass(UClass* LoadedQuestClass)
 {
-	QuestSignalSubsystem->PublishTyped(UQuestGiverInterface::StaticClass(), FQuestRegistrationEvent(LoadedQuestClass->GetFName(), LoadedQuestClass, GetOwner()));
+	QuestSignalSubsystem->PublishTyped(UQuestGiverInterface::StaticClass(), FQuestRegistrationEvent(LoadedQuestClass->GetDefaultObject<UQuest>()->GetQuestTag(), LoadedQuestClass, GetOwner()));
 }
 
 void UQuestGiverComponent::OnQuestEnabledEventReceived(const FQuestEnabledEvent& QuestEnabledEvent)
@@ -69,7 +69,7 @@ void UQuestGiverComponent::GiveQuest(UQuest* QuestToStart)
 		{
 			if (CheckQuestSignalSubsystem())
 			{
-				QuestSignalSubsystem->PublishTyped(QuestClass, FTryQuestStartEvent(QuestClass->GetFName(), QuestClass));
+				QuestSignalSubsystem->PublishTyped(QuestClass, FTryQuestStartEvent(QuestToStart->GetQuestTag(), QuestClass));
 				UE_LOG(LogSimpleQuest, Log, TEXT("UQuestGiverComponent::StartQuest : attempting to start quest: %s"), *QuestClass->GetName());
 			}
 			else
@@ -112,20 +112,20 @@ bool UQuestGiverComponent::CanGiveAnyQuests() const
 	return !EnabledQuests.IsEmpty();
 }
 
-bool UQuestGiverComponent::IsQuestEnabled(const FString& QuestID)
+bool UQuestGiverComponent::IsQuestEnabled(const FGuid& QuestGuid)
 {
 	for (auto Quest : EnabledQuests)
 	{
 		if (Quest.Value)
 		{
-			if (Quest.Value->GetQuestID() == QuestID)
+			if (Quest.Value->GetQuestGuid() == QuestGuid)
 			{
-				UE_LOG(LogSimpleQuest, VeryVerbose, TEXT("UQuestGiverComponent::IsQuestEnabled : Found QuestID: %s"), *QuestID);
+				UE_LOG(LogSimpleQuest, VeryVerbose, TEXT("UQuestGiverComponent::IsQuestEnabled : Found QuestID: %s"), *Quest.Value->GetName());
 				return true;
 			}
 		}
 	}
-	UE_LOG(LogSimpleQuest, VeryVerbose, TEXT("UQuestGiverComponent::IsQuestEnabled : Did not find QuestID: %s"), *QuestID);
+	UE_LOG(LogSimpleQuest, VeryVerbose, TEXT("UQuestGiverComponent::IsQuestEnabled : Did not find QuestID: %s"), *QuestGuid.ToString());
 	return false;
 }
 

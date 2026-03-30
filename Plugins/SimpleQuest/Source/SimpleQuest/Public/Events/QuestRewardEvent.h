@@ -13,8 +13,8 @@ struct FQuestRewardEvent : public FQuestEventBase
 	
 	FQuestRewardEvent() = default;
 
-	FQuestRewardEvent(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass, UQuestReward* InRewardObject)
-		: FQuestEventBase(InQuestID, InQuestClass), RewardObject(InRewardObject) {}
+	FQuestRewardEvent(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass, UQuestReward* InRewardObject)
+		: FQuestEventBase(InQuestTag, InQuestClass), RewardObject(InRewardObject) {}
 	
 	UPROPERTY(BlueprintReadWrite)
 	UQuestReward* RewardObject = nullptr;

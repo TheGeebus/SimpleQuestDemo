@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 
 #include "Components/QuestTargetComponent.h"
@@ -63,7 +63,7 @@ void UQuestTargetComponent::GetTriggered()
 {
 	if (CheckQuestSignalSubsystem())
 	{
-		QuestSignalSubsystem->PublishTyped(UQuestTargetInterface::StaticClass(), FQuestObjectiveTriggered(FName(), nullptr, GetOwner()));
+		QuestSignalSubsystem->PublishTyped(UQuestTargetInterface::StaticClass(), FQuestObjectiveTriggered(FGameplayTag(), nullptr, GetOwner()));
 	}
 }
 
@@ -71,7 +71,7 @@ void UQuestTargetComponent::GetKilled(AActor* KillerActor)
 {
 	if (CheckQuestSignalSubsystem())
 	{
-		QuestSignalSubsystem->PublishTyped<FQuestObjectiveTriggered>(UQuestTargetInterface::StaticClass(), FQuestObjectiveKilled(FName(), nullptr, GetOwner(), KillerActor));
+		QuestSignalSubsystem->PublishTyped<FQuestObjectiveTriggered>(UQuestTargetInterface::StaticClass(), FQuestObjectiveKilled(FGameplayTag(), nullptr, GetOwner(), KillerActor));
 	}
 }
 
@@ -79,6 +79,6 @@ void UQuestTargetComponent::GetInteracted(AActor* InteractingActor)
 {
 	if (CheckQuestSignalSubsystem())
 	{
-		QuestSignalSubsystem->PublishTyped<FQuestObjectiveTriggered>(UQuestTargetInterface::StaticClass(), FQuestObjectiveInteracted(FName(), nullptr, GetOwner(), InteractingActor));
+		QuestSignalSubsystem->PublishTyped<FQuestObjectiveTriggered>(UQuestTargetInterface::StaticClass(), FQuestObjectiveInteracted(FGameplayTag(), nullptr, GetOwner(), InteractingActor));
 	}
 }

@@ -13,6 +13,6 @@ struct FQuestPrerequisiteCheckFailed : public FQuestEventBase
 
 	FQuestPrerequisiteCheckFailed() = default;
 
-	explicit FQuestPrerequisiteCheckFailed(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass)
-		: FQuestEventBase(InQuestID, InQuestClass) {}	
+	explicit FQuestPrerequisiteCheckFailed(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass)
+		: FQuestEventBase(InQuestTag, InQuestClass) {}	
 };

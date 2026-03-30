@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #pragma once
 
@@ -17,6 +17,6 @@ struct FTryQuestStartEvent : public FQuestEventBase
 
 	FTryQuestStartEvent() = default;
 
-	explicit FTryQuestStartEvent(const FName InQuestID, const TSubclassOf<UQuest>& InQuestClass)
-		: FQuestEventBase(InQuestID, InQuestClass) {}
+	explicit FTryQuestStartEvent(const FGameplayTag InQuestTag, const TSubclassOf<UQuest>& InQuestClass)
+		: FQuestEventBase(InQuestTag, InQuestClass) {}
 };

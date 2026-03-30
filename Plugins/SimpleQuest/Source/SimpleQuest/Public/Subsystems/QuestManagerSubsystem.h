@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "QuestTypes.h"
 #include "QuestManagerSubsystem.generated.h"
 
+struct FGameplayTag;
 class UQuestReward;
 struct FQuestStartedEvent;
 struct FTryQuestStartEvent;
@@ -166,7 +167,7 @@ protected:
 	UFUNCTION()
 	void OnQuestStepEndedEvent(UQuest* ActiveQuest, int32 CompletedQuestStep, bool bDidSucceed, bool bEndedQuest, UQuestReward* Reward);
 	void PublishQuestEndEvent(const UQuest* EndedQuest, bool bDidSucceed) const;
-	void SetQuestEnabled(FName LoadedQuestID, const TSubclassOf<UQuest>& LoadedQuestClass, bool bIsEnabled);
+	void SetQuestEnabled(const FGameplayTag QuestTag, const TSubclassOf<UQuest>& LoadedQuestClass, bool bIsEnabled);
 	void ActivateQuestClass(const TSoftClassPtr<UQuest>& InQuestClass);
 
 	/**

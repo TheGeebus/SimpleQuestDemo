@@ -5,9 +5,11 @@
 #include "AssetToolsModule.h"
 #include "Modules/ModuleManager.h"
 #include "EdGraphUtilities.h"
+#include "QuestlineGraphCompiler.h"
 #include "SGraphNodeKnot.h"
 #include "Graph/QuestlineGraphSchema.h"
 #include "Nodes/QuestlineNode_Knot.h"
+#include "Toolkit/QuestlineGraphEditorCommands.h"
 
 
 IMPLEMENT_MODULE(FSimpleQuestEditor, SimpleQuestEditor);
@@ -35,10 +37,14 @@ void FSimpleQuestEditor::StartupModule()
 
 	QuestlineConnectionFactory = UQuestlineGraphSchema::MakeQuestlineConnectionFactory();
 	FEdGraphUtilities::RegisterVisualPinConnectionFactory(QuestlineConnectionFactory);
+
+	FQuestlineGraphEditorCommands::Register();
 }
 
 void FSimpleQuestEditor::ShutdownModule()
 {
+	FQuestlineGraphEditorCommands::Unregister();
+	
 	if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
 	{
 		IAssetTools& AssetTools = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -55,6 +61,31 @@ void FSimpleQuestEditor::ShutdownModule()
 
 
 }
+
+void FSimpleQuestEditor::RegisterCompilerFactory(FQuestlineCompilerFactoryDelegate InFactory)
+{
+	CompilerFactory = MoveTemp(InFactory);
+}
+
+void FSimpleQuestEditor::UnregisterCompilerFactory()
+{
+	CompilerFactory.Unbind();
+}
+
+TUniquePtr<FQuestlineGraphCompiler> FSimpleQuestEditor::CreateCompiler() const
+{
+	if (CompilerFactory.IsBound())
+	{
+		TUniquePtr<FQuestlineGraphCompiler> CustomCompiler = CompilerFactory.Execute();
+		if (CustomCompiler.IsValid())
+		{
+			return CustomCompiler;
+		}
+		UE_LOG(LogTemp, Warning, TEXT("FSimpleQuestEditor::CreateCompiler : Registered factory returned null. Falling back to default compiler."));
+	}
+	return MakeUnique<FQuestlineGraphCompiler>();
+}
+
 /*
 class FQuestlineConnectionFactory : public FGraphPanelPinConnectionFactory
 {

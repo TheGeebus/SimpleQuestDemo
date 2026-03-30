@@ -2,34 +2,21 @@
 
 #include "Graph/QuestlineGraphSchema.h"
 
+#include "BlueprintConnectionDrawingPolicy.h"
 #include "Nodes/QuestlineNode_Entry.h"
 #include "Nodes/QuestlineNode_Knot.h"
 #include "Nodes/QuestlineNode_Quest.h"
 #include "Utilities/SimpleQuestEditorUtils.h"
 #include "ConnectionDrawingPolicy.h"
 #include "EdGraphUtilities.h"
-#include "NodeFactory.h" 
 #include "Nodes/QuestlineNode_Exit_Failure.h"
 #include "Nodes/QuestlineNode_Exit_Success.h"
 #include "ScopedTransaction.h"
+#include "Graph/QuestlineDrawingPolicyMixin.h"
 
 
-// Shared helper — called by both drawing policies to avoid duplicating color/flag logic
-static void ApplyQuestlineWireParams(UEdGraphPin* OutputPin, UEdGraphPin* InputPin, FConnectionParams& Params)
-{
-	if (OutputPin)
-	{
-		const FName Category = OutputPin->PinType.PinCategory;
-		if (Category == TEXT("QuestSuccess")) Params.WireColor = SQ_ED_GREEN;
-		else if (Category == TEXT("QuestFailure")) Params.WireColor = SQ_ED_RED;
-		else Params.WireColor = FLinearColor::White;
-	}
-	if (InputPin && InputPin->PinName == TEXT("Prerequisites"))
-		Params.bUserFlag1 = true;
-}
-
-// Returns true if OutputPin already leads to any exit node (directly or via reroutes).
-// Enforces: one output pin → at most one exit node.
+// Returns true if OutputPin already leads to any exit node (directly or via reroutes). Enforces: one output pin → at
+// most one exit node.
 static bool HasDownstreamExit(const UEdGraphPin* OutputPin, TSet<const UEdGraphNode*>& Visited)
 {
 	if (!OutputPin) return false;
@@ -48,8 +35,8 @@ static bool HasDownstreamExit(const UEdGraphPin* OutputPin, TSet<const UEdGraphN
 	return false;
 }
 
-// Returns true if OutputPin leads to TargetNode (directly or via reroutes).
-// Used to check whether a source quest node already has a path to a given exit node.
+// Returns true if OutputPin leads to TargetNode (directly or via reroutes). Used to check whether a source quest node
+// already has a path to a given exit node.
 static bool LeadsToNode(const UEdGraphPin* OutputPin, const UEdGraphNode* TargetNode, TSet<const UEdGraphNode*>& Visited)
 {
 	if (!OutputPin) return false;
@@ -68,41 +55,31 @@ static bool LeadsToNode(const UEdGraphPin* OutputPin, const UEdGraphNode* Target
 	return false;
 }
 
-class FQuestlineConnectionDrawingPolicy : public FConnectionDrawingPolicy
+class FQuestlineConnectionDrawingPolicy	: public TQuestlineDrawingPolicyMixin<FKismetConnectionDrawingPolicy>
 {
+	using Super = TQuestlineDrawingPolicyMixin<FKismetConnectionDrawingPolicy>;
 public:
 	FQuestlineConnectionDrawingPolicy(int32 InBackLayerID, int32 InFrontLayerID, float InZoomFactor, const FSlateRect& InClippingRect,
 		FSlateWindowElementList& InDrawElements, UEdGraph* InGraph)
-		: FConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements), GraphObj(InGraph)
-	{}
-
-	virtual void DetermineWiringStyle(UEdGraphPin* OutputPin, UEdGraphPin* InputPin, FConnectionParams& Params) override
+		: Super(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraph)
 	{
-		FConnectionDrawingPolicy::DetermineWiringStyle(OutputPin, InputPin, Params);
-		if (OutputPin) Params.StartDirection = OutputPin->Direction;
-		if (InputPin) Params.EndDirection = InputPin->Direction;
-
-		Params.WireThickness = Settings->DefaultDataWireThickness;
-		ApplyQuestlineWireParams(OutputPin, InputPin, Params);
-
-		if (HoveredPins.Num() > 0)
-		{
-			ApplyHoverDeemphasis(OutputPin, InputPin, Params.WireThickness, Params.WireColor);
-		}
+		GraphObj = InGraph;
 	}
 
+	/*
 	virtual void Draw(TMap<TSharedRef<SWidget>, FArrangedWidget>& InPinGeometries, FArrangedChildren& ArrangedNodes) override
 	{
 		FConnectionDrawingPolicy::Draw(InPinGeometries, ArrangedNodes);
 	}
-
+	*/
+	
 	virtual void DrawConnection(int32 LayerId, const FVector2f& Start, const FVector2f& End, const FConnectionParams& Params) override
 	{		
 		const FVector2f SplineTangent = ComputeSplineTangent(Start, End);
-		const FVector2f P0Tangent = Params.StartTangent.IsNearlyZero()
+		const FVector2f P0Tangent = Params.StartTangent.IsNearlyZero() /* ? DirectionalSplineTangent : Params.StartTangent; */
 			? ((Params.StartDirection == EGPD_Output) ? SplineTangent : -SplineTangent)
 			: Params.StartTangent;
-		const FVector2f P1Tangent = Params.EndTangent.IsNearlyZero()
+		const FVector2f P1Tangent = Params.EndTangent.IsNearlyZero() /* ? DirectionalSplineTangent : Params.EndTangent; */
 			? ((Params.EndDirection == EGPD_Input) ? SplineTangent : -SplineTangent)
 			: Params.EndTangent;
 		
@@ -244,19 +221,8 @@ public:
 		FSlateWindowElementList& InDrawElements,
 		UEdGraph* InGraphObj) const override
 	{
-		if (!Cast<const UQuestlineGraphSchema>(Schema))
-			return nullptr;
-
-		// Guard against re-entry: when FNodeFactory calls back into us during
-		// the inner iteration, return nullptr so EN's factory wins that call.
-		if (bInProgress)
-			return nullptr;
-
-		bInProgress = true;
-		FConnectionDrawingPolicy* Policy = FNodeFactory::CreateConnectionPolicy(
-			Schema, InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
-		bInProgress = false;
-		return Policy;
+		if (!Cast<const UQuestlineGraphSchema>(Schema)) return nullptr;
+		return Schema->CreateConnectionDrawingPolicy(InBackLayerID, InFrontLayerID, InZoomFactor, InClippingRect, InDrawElements, InGraphObj);
 	}
 };
 

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #pragma once
 
@@ -53,5 +53,5 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool CanGiveAnyQuests() const;
 	UFUNCTION(BlueprintCallable)
-	bool IsQuestEnabled(const FString& QuestID);
+	bool IsQuestEnabled(const FGuid& QuestGuid);
 };
