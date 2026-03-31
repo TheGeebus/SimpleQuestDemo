@@ -1,6 +1,6 @@
 ﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
 
-#include "QuestlineGraphCompiler.h"
+#include "Utilities/QuestlineGraphCompiler.h"
 #include "Quests/QuestlineGraph.h"
 #include "Quests/Quest.h"
 #include "Nodes/QuestlineNode_Quest.h"
@@ -65,13 +65,16 @@ void FQuestlineGraphCompiler::CompileOuterGraph(UQuestlineGraph* InGraph)
     const FString QuestlineName = SanitizeTagSegment(
         InGraph->QuestlineID.IsEmpty() ? InGraph->GetName() : InGraph->QuestlineID);
 
+    TArray<UQuestlineNode_Quest*> QuestNodes;
+    
     // Pass 1: validate node label is unique within this graph
     TMap<FString, UQuestlineNode_Quest*> LabelMap;
     for (UEdGraphNode* Node : InGraph->QuestlineEdGraph->Nodes)
     {
         UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(Node);
         if (!QuestNode) continue;
-
+        QuestNodes.Add(QuestNode);
+        
         const FString Label = SanitizeTagSegment(QuestNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
 
         if (Label.IsEmpty())
@@ -99,11 +102,8 @@ void FQuestlineGraphCompiler::CompileOuterGraph(UQuestlineGraph* InGraph)
     InGraph->CompiledQuestTags.Empty();
 
     // Pass 3: write compiled data to each Quest CDO
-    for (UEdGraphNode* Node : InGraph->QuestlineEdGraph->Nodes)
+    for (UQuestlineNode_Quest* QuestNode : QuestNodes)
     {
-        UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(Node);
-        if (!QuestNode) continue;
-
         if (!QuestNode->QuestClass)
         {
             AddWarning(FString::Printf(
@@ -150,7 +150,7 @@ void FQuestlineGraphCompiler::CompileOuterGraph(UQuestlineGraph* InGraph)
                     CDO->NextQuestsOnSuccess.Add(Successor->QuestClass.Get());
             }
         }
-
+        
         // Resolve Failure output: NextQuestsOnFailure
         if (UEdGraphPin* FailurePin = QuestNode->FindPin(TEXT("Failure"), EGPD_Output))
         {

@@ -1,6 +1,6 @@
 # SimpleQuest
 
-A source-available Unreal Engine plugin for non-linear, branching quest systems. Currently free for non-commercial use, a future MIT licensed free-use release is planned following a funding milestone. SimpleQuest is built on a directed acyclic graph of quest steps with a typed publish/subscribe event bus, giving designers the freedom to craft questlines that feel alive rather than scripted.
+A source-available Unreal Engine plugin for non-linear, branching quest systems. SimpleQuest is built on a directed acyclic graph of quest steps with a typed publish/subscribe event bus, giving designers the freedom to craft questlines that feel alive rather than scripted. Currently free for non-commercial use, an upcoming MIT licensed free-use release is planned following a future funding milestone.
 
 This version is for Unreal Engine 5.6.
 

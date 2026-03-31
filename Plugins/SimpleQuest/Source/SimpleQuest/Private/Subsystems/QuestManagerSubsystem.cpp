@@ -186,10 +186,11 @@ UQuest* UQuestManagerSubsystem::LoadQuest(const TSoftClassPtr<UQuest>& QuestClas
 				UE_LOG(LogSimpleQuest, VeryVerbose, TEXT("UQuestManagerSubsystem::LoadQuest : QuestGiverMap contains quest: %s"), *Pair.Key->GetName());
 			}
 		}
-
+		/*
 		NewQuest->OnUpdateQuestText.BindDynamic(this, &UQuestManagerSubsystem::UpdateQuestText);
 		NewQuest->OnSetQuestTextVisibility.BindDynamic(this, &UQuestManagerSubsystem::UpdateQuestTextVisibility);
 		NewQuest->OnQueueCommsEvent.BindDynamic(this, &UQuestManagerSubsystem::QueueCommsEvent);
+		*/
 		NewQuest->OnQuestStepStarted.BindDynamic(this, &UQuestManagerSubsystem::OnQuestStepStartedEvent);
 		NewQuest->OnQuestStepPrereqsFail.BindDynamic(this, &UQuestManagerSubsystem::OnQuestStepPrereqCheckFail);
 		NewQuest->OnQuestStepComplete.BindDynamic(this, &UQuestManagerSubsystem::OnQuestStepEndedEvent);
@@ -259,7 +260,8 @@ void UQuestManagerSubsystem::ActivateQuestClass(const TSoftClassPtr<UQuest>& InQ
 		UE_LOG(LogSimpleQuest, Verbose, TEXT("UQuestManagerSubsystem::ActivateQuestClass : enabling quest: %s"), *LoadedQuest->GetQuestTag().ToString());
 		SetQuestEnabled(LoadedQuest->GetQuestTag(), LoadedQuest->GetClass(), true);
 		UE_LOG(LogSimpleQuest, Verbose, TEXT("UQuestManagerSubsystem::ActivateQuestClass : Quest loaded: %s"), *LoadedQuest->GetQuestTag().ToString());
-		if (!QuestGiverMap.Contains(LoadedQuest->GetClass()))
+
+		if (!QuestsWithGivers.Contains(LoadedQuest->GetQuestTag()))
 		{
 			UE_LOG(LogSimpleQuest, Log, TEXT("UQuestManagerSubsystem::ActivateQuestClass : no quest givers found, starting: %s"), *LoadedQuest->GetClass()->GetName());
 			StartQuest(LoadedQuest->GetClass());
@@ -320,7 +322,7 @@ bool UQuestManagerSubsystem::StartQuest_Implementation(const TSoftClassPtr<UQues
 	{
 		QuestSignalSubsystem->PublishTyped(StartedQuest->GetClass(), FQuestStartedEvent(StartedQuest->GetQuestTag(), StartedQuest->GetClass()));
 	}
-	StartedQuest->OnUpdateQuestText.BindDynamic(this, &UQuestManagerSubsystem::UpdateQuestText); // redundant?
+	// StartedQuest->OnUpdateQuestText.BindDynamic(this, &UQuestManagerSubsystem::UpdateQuestText); // redundant?
 	StartedQuest->StartQuestStep(0);
 	return true;
 }
@@ -387,6 +389,7 @@ void UQuestManagerSubsystem::CheckQuestObjectives(const FQuestObjectiveTriggered
 	}
 }
 
+/*
 void UQuestManagerSubsystem::QueueCommsEvent(const FCommsEvent& InCommsEvent)
 {
 	const FCommsEvent NewEvent = InCommsEvent;
@@ -460,6 +463,7 @@ void UQuestManagerSubsystem::UpdateQuestTextVisibility(bool bIsVisible, bool bUs
 		OnQuestTextVisibilityUpdated.Broadcast(bIsVisible, bUseCounter);
 	}
 }
+*/
 
 void UQuestManagerSubsystem::CompleteQuest(UQuest* CompletedQuest, bool bDidSucceed)
 {

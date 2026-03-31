@@ -5,7 +5,7 @@
 #include "Quests/QuestlineGraph.h"
 #include "GraphEditor.h"
 #include "GraphEditorActions.h"
-#include "QuestlineGraphCompiler.h"
+#include "Utilities/QuestlineGraphCompiler.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/Commands/GenericCommands.h"

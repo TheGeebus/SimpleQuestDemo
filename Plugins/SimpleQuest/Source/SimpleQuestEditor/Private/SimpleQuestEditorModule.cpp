@@ -5,11 +5,12 @@
 #include "AssetToolsModule.h"
 #include "Modules/ModuleManager.h"
 #include "EdGraphUtilities.h"
-#include "QuestlineGraphCompiler.h"
+#include "Utilities/QuestlineGraphCompiler.h"
 #include "SGraphNodeKnot.h"
 #include "Graph/QuestlineGraphSchema.h"
 #include "Nodes/QuestlineNode_Knot.h"
 #include "Toolkit/QuestlineGraphEditorCommands.h"
+#include "Utilities/QuestGiverManifestBuilder.h"
 
 
 IMPLEMENT_MODULE(FSimpleQuestEditor, SimpleQuestEditor);
@@ -37,12 +38,18 @@ void FSimpleQuestEditor::StartupModule()
 
 	QuestlineConnectionFactory = UQuestlineGraphSchema::MakeQuestlineConnectionFactory();
 	FEdGraphUtilities::RegisterVisualPinConnectionFactory(QuestlineConnectionFactory);
-
+	
 	FQuestlineGraphEditorCommands::Register();
+
+	FEditorDelegates::MapChange.AddRaw(this, &FSimpleQuestEditor::OnMapChanged);
+	FEditorDelegates::PreBeginPIE.AddRaw(this, &FSimpleQuestEditor::OnPreBeginPIE);
 }
 
 void FSimpleQuestEditor::ShutdownModule()
 {
+	FEditorDelegates::MapChange.RemoveAll(this);
+	FEditorDelegates::PreBeginPIE.RemoveAll(this);
+	
 	FQuestlineGraphEditorCommands::Unregister();
 	
 	if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
@@ -84,6 +91,16 @@ TUniquePtr<FQuestlineGraphCompiler> FSimpleQuestEditor::CreateCompiler() const
 		UE_LOG(LogTemp, Warning, TEXT("FSimpleQuestEditor::CreateCompiler : Registered factory returned null. Falling back to default compiler."));
 	}
 	return MakeUnique<FQuestlineGraphCompiler>();
+}
+
+void FSimpleQuestEditor::OnMapChanged(uint32 MapChangeEventFlag)
+{
+	if (MapChangeEventFlag == static_cast<uint32>(EMapChangeType::SaveMap)) FQuestGiverManifestBuilder::RebuildManifest();
+}
+
+void FSimpleQuestEditor::OnPreBeginPIE(const bool bIsSimulating)
+{
+	FQuestGiverManifestBuilder::RebuildManifest();
 }
 
 /*

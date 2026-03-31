@@ -4,11 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "QuestTypes.h"
 #include "QuestManagerSubsystem.generated.h"
 
 struct FGameplayTag;
-class UQuestReward;
 struct FQuestStartedEvent;
 struct FTryQuestStartEvent;
 struct FQuestRegistrationEvent;
@@ -19,6 +17,8 @@ class IQuestTargetInterface;
 class UQuestGiverInterface;
 struct FQuestText;
 class UQuest;
+class UQuestReward;
+class UQuestGiverManifest;
 
 USTRUCT(BlueprintType)
 struct FQuestGivers
@@ -42,7 +42,7 @@ struct FQuestWatchers
  * This class manages quests and quest givers, loading and unloading quests as needed. It handles the registration of actors
  * who have a quest giver component when they begin play. 
  */
-UCLASS(Abstract, Blueprintable)
+UCLASS(Abstract, Blueprintable, config = Game)
 class SIMPLEQUEST_API UQuestManagerSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
@@ -72,10 +72,12 @@ public:
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTargetClassAdded, TSubclassOf<AActor>, InTargetClass);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTargetClassRemoved, TSubclassOf<AActor>, InTargetClass);
+	/*
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnQuestTextUpdated, const FQuestText&, InQuestText);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnQuestTextVisibilityUpdated, bool, bIsVisible, bool, bUseCounter);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCommsEventStart, const FCommsEvent&, InCommsEvent);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCommsEventEnd);
+	*/
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQuestEnd);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQuestlineEnd);
 	
@@ -83,6 +85,7 @@ public:
 	FOnTargetClassAdded OnTargetClassAdded;
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
 	FOnTargetClassRemoved OnTargetClassRemoved;
+	/*
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
 	FOnQuestTextUpdated OnQuestTextUpdated;
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
@@ -91,6 +94,7 @@ public:
 	FOnCommsEventStart OnCommsEventStart;
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
 	FOnCommsEventEnd OnCommsEventEnd;
+	*/
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
 	FOnQuestEnd OnQuestEnd;
 	UPROPERTY(BlueprintAssignable, BlueprintCallable)
@@ -124,6 +128,10 @@ public:
 	 */
 	void RegisterQuestWatcher(const FQuestRegistrationEvent& QuestWatcherRegistrationEvent);
 	void OnTryQuestStartEvent(const FTryQuestStartEvent& Event);
+
+	// Auto-populated by the editor on save/PIE. Do not edit manually.
+	UPROPERTY(Config, VisibleAnywhere, BlueprintReadOnly, Category="Quest Givers")
+	TSet<FGameplayTag> QuestsWithGivers;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="RegisteredActorComponents")
 	TMap<TSoftClassPtr<UQuest>, FQuestGivers> QuestGiverMap;
@@ -141,7 +149,7 @@ protected:
 	// Quests to load when the game launches. 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "QuestMap", meta = (AllowPrivateAccess = "true"))
 	TArray<TSoftClassPtr<UQuest>> InitialQuests;
-	
+
 	// Quests currently loaded by the quest manager subsystem.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LoadedQuests", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UQuest>> LoadedQuests;
@@ -157,22 +165,24 @@ protected:
 	UPROPERTY()
 	TMap<TSubclassOf<UQuest>, bool> CompletedQuestClasses;
 	
-	UQuest* LoadQuest(const TSoftClassPtr<UQuest>& QuestClass);
-	UQuest* FindLoadedQuestByClass(const TSubclassOf<UQuest>& InQuest);
-	void DeactivateQuestGivers(const UQuest* DeactivatedQuest) const;
+	virtual UQuest* LoadQuest(const TSoftClassPtr<UQuest>& QuestClass);
+	virtual UQuest* FindLoadedQuestByClass(const TSubclassOf<UQuest>& InQuest);
+	virtual void DeactivateQuestGivers(const UQuest* DeactivatedQuest) const;
 	UFUNCTION()
-	void OnQuestStepStartedEvent(UQuest* ActiveQuest, int32 StartedQuestStepID);
+	virtual void OnQuestStepStartedEvent(UQuest* ActiveQuest, int32 StartedQuestStepID);
 	UFUNCTION()
-	void OnQuestStepPrereqCheckFail(UQuest* ActiveQuest, int32 StepWithPrereqsID);
+	virtual void OnQuestStepPrereqCheckFail(UQuest* ActiveQuest, int32 StepWithPrereqsID);
 	UFUNCTION()
-	void OnQuestStepEndedEvent(UQuest* ActiveQuest, int32 CompletedQuestStep, bool bDidSucceed, bool bEndedQuest, UQuestReward* Reward);
-	void PublishQuestEndEvent(const UQuest* EndedQuest, bool bDidSucceed) const;
-	void SetQuestEnabled(const FGameplayTag QuestTag, const TSubclassOf<UQuest>& LoadedQuestClass, bool bIsEnabled);
-	void ActivateQuestClass(const TSoftClassPtr<UQuest>& InQuestClass);
+	virtual void OnQuestStepEndedEvent(UQuest* ActiveQuest, int32 CompletedQuestStep, bool bDidSucceed, bool bEndedQuest, UQuestReward* Reward);
+	virtual void PublishQuestEndEvent(const UQuest* EndedQuest, bool bDidSucceed) const;
+	virtual void SetQuestEnabled(const FGameplayTag QuestTag, const TSubclassOf<UQuest>& LoadedQuestClass, bool bIsEnabled);
+	virtual void ActivateQuestClass(const TSoftClassPtr<UQuest>& InQuestClass);
 
+	
 	/**
 	 * HUD stuff - should probably be abstracted into another system that binds to the events on this one 
 	 */
+	/*
 	TArray<FCommsEvent> CommsEventQueue;
 	FTimerHandle CommsEventTimerHandle;
 	void CommsEventTimerEnd();
@@ -183,6 +193,7 @@ protected:
 	void UpdateQuestText(const FQuestText& InQuestText);
 	UFUNCTION()
 	void UpdateQuestTextVisibility(bool bIsVisible, bool bUseCounter);
+	*/
 	
 	UFUNCTION()
 	void CompleteQuest(UQuest* CompletedQuest, bool bDidSucceed);
@@ -191,6 +202,7 @@ protected:
 	UFUNCTION()
 	void OnQuestTargetEnabledEvent(UQuest* InQuest, UObject* TargetObject, int32 InStepID, bool bNewIsEnabled);
 
+	/*
 	// Voice line audio player. 
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> AudioComponent;
@@ -198,7 +210,8 @@ protected:
 	// How long to keep the subtitles on screen after playing a voice line.
 	UPROPERTY(EditDefaultsOnly)
 	float CommsEventSubtitleDelay = 3.f;
-
+	*/
+	
 	UPROPERTY()
 	TObjectPtr<UQuest> QuestDefaultObject;
 
@@ -208,4 +221,5 @@ protected:
 	FDelegateHandle QuestWatcherRegistrationDelegateHandle;
 	FDelegateHandle QuestGiverRegistrationDelegateHandle;
 	FDelegateHandle ObjectiveTriggeredDelegateHandle;
+
 };

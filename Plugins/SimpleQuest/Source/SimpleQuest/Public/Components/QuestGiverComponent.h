@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "QuestComponentBase.h"
 #include "Components/ActorComponent.h"
 #include "Interfaces/QuestGiverInterface.h"
@@ -30,10 +31,20 @@ public:
 	
 protected:
 	virtual void BeginPlay() override;
-
+	/**
+	 * Transitional — internal subscription and registration still uses this.
+	 * Will be removed when QuestTagsToGive drives the full component lifecycle.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<TSoftClassPtr<UQuest>> QuestClassesToGive;
-
+	
+	/**
+	 * New authoritative property — read by the manifest builder and eventually the sole registration mechanism once the
+	 * full tag-based rework is complete.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTagContainer QuestTagsToGive;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<TSubclassOf<UQuest>, TObjectPtr<UQuest>> EnabledQuests;
 	
@@ -50,6 +61,8 @@ private:
 	void OnQuestEnabledEventReceived(const FQuestEnabledEvent& QuestEnabledEvent);
 
 public:
+	UFUNCTION(BlueprintCallable)
+	FGameplayTagContainer GetQuestTagsToGive() const { return QuestTagsToGive; };
 	UFUNCTION(BlueprintCallable)
 	bool CanGiveAnyQuests() const;
 	UFUNCTION(BlueprintCallable)
