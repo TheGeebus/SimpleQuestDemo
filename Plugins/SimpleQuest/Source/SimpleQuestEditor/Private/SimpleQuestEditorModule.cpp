@@ -11,6 +11,7 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Nodes/QuestlineNode_Knot.h"
 #include "Settings/SimpleQuestSettings.h"
+#include "Subsystems/QuestManagerSubsystem.h"
 
 
 IMPLEMENT_MODULE(FSimpleQuestEditor, SimpleQuestEditor);
@@ -38,6 +39,11 @@ void FSimpleQuestEditor::StartupModule()
 
 	QuestlineConnectionFactory = UQuestlineGraphSchema::MakeQuestlineConnectionFactory();
 	FEdGraphUtilities::RegisterVisualPinConnectionFactory(QuestlineConnectionFactory);
+
+	FEditorDelegates::PreBeginPIE.AddLambda([](bool)
+	{
+		GetDefault<USimpleQuestSettings>()->QuestManagerClass.LoadSynchronous();
+	});
 }
 
 void FSimpleQuestEditor::ShutdownModule()
