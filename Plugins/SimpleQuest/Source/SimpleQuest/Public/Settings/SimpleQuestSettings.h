@@ -19,8 +19,6 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Initialization")
 	TSoftClassPtr<UQuestManagerSubsystem> QuestManagerClass = TSoftClassPtr<UQuestManagerSubsystem>(FSoftObjectPath(TEXT("/SimpleQuest/BP_QuestManager.BP_QuestManager_C")));
 
-	UPROPERTY(Config, EditAnywhere, Category="Initialization")
-	TArray<TSoftClassPtr<UQuest>> InitialQuests;
 };
 
 UCLASS()

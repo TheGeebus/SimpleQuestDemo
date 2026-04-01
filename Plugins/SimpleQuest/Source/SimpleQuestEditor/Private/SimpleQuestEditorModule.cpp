@@ -42,7 +42,22 @@ void FSimpleQuestEditor::StartupModule()
 
 	FEditorDelegates::PreBeginPIE.AddLambda([](bool)
 	{
-		GetDefault<USimpleQuestSettings>()->QuestManagerClass.LoadSynchronous();
+		const USimpleQuestSettings* Settings = GetDefault<USimpleQuestSettings>();
+
+		// Strip _C from the class path to get the Blueprint asset path
+		FString ClassPath = Settings->QuestManagerClass.ToString();
+		if (!ClassPath.RemoveFromEnd(TEXT("_C")))
+		{
+			//return; // Not a Blueprint-generated class, nothing to compile
+		}
+
+		if (UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ClassPath))
+		{
+			if (Blueprint->Status != EBlueprintStatus::BS_UpToDate)
+			{
+				FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::SkipGarbageCollection);
+			}
+		}
 	});
 }
 

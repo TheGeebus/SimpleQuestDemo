@@ -57,10 +57,9 @@ void UQuestManagerSubsystem::Deinitialize()
 
 void UQuestManagerSubsystem::StartInitialQuests_Implementation()
 {
-	TArray<TSoftClassPtr<UQuest>> QuestsToStart = GetSimpleQuestSettings()->InitialQuests;
-	if (!QuestsToStart.IsEmpty())
+	if (!InitialQuests.IsEmpty())
 	{
-		for (const TSoftClassPtr<UQuest>& QuestSoftClass : QuestsToStart)
+		for (const TSoftClassPtr<UQuest>& QuestSoftClass : InitialQuests)
 		{
 			if (const UClass* QuestClass = QuestSoftClass.LoadSynchronous())
 			{
