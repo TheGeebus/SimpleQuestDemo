@@ -2,7 +2,7 @@
 
 A source-available Unreal Engine plugin for the management and visual authoring of linear and non-linear linked goals: featuring support for branching, converging, and looping gameplay event sequences in any game type. Currently free for non-commercial use, a future MIT licensed free-use release is planned following a funding milestone. SimpleQuest is built on a general directed graph of quest steps with a typed publish/subscribe event bus, giving designers the freedom to craft questlines that feel alive rather than scripted.
 
-While the visual graph asset shown below can be created in the current iteration, it is not yet fully functional. Sequence authoring is currently still done according to the method described in Quick Start section. Fully functional visual graph authoring of goal sequences will be included in the upcoming release.
+While the visual graph asset shown below can be created in the current iteration, it is not yet fully functional. Sequence authoring is currently still done according to the method described in the Quick Start section. Fully functional visual graph authoring of goal sequences will be included in the upcoming release.
 
 ![SimpleQuestDemo-v0 3](https://github.com/user-attachments/assets/4c800c0e-f417-4e22-941d-824b321b7cfc)
 
