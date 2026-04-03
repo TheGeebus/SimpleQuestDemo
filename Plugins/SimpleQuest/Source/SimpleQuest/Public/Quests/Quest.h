@@ -22,7 +22,7 @@ class UQuestObjective;
  * as needed.
  */
 USTRUCT(BlueprintType)
-struct FQuestStep
+struct FQuestStepStruct
 {
 	GENERATED_USTRUCT_BODY()
 
@@ -250,7 +250,7 @@ protected:
 	 * probably be moved to another module.
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)	
-	TArray<FQuestStep> QuestSteps;
+	TArray<FQuestStepStruct> QuestSteps;
 	
 	/**
 	 * By default, successful completion of the last step in the QuestSteps array will also complete the associated

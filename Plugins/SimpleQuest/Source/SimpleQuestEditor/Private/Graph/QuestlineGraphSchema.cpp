@@ -13,6 +13,8 @@
 #include "Nodes/QuestlineNode_Exit_Success.h"
 #include "ScopedTransaction.h"
 #include "Graph/QuestlineDrawingPolicyMixin.h"
+#include "Nodes/QuestlineNode_Leaf.h"
+#include "Nodes/QuestlineNode_LinkedQuestline.h"
 
 
 // Returns true if OutputPin already leads to any exit node (directly or via reroutes). Enforces: one output pin → at
@@ -284,8 +286,8 @@ void UQuestlineGraphSchema::OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGr
 	}
 }
 
-void UQuestlineGraphSchema::CollectSourceQuests(const UEdGraphPin* Pin, TSet<UQuestlineNode_Quest*>& OutSources,
-                                                TSet<const UEdGraphNode*>& Visited)
+void UQuestlineGraphSchema::CollectSourceNodes(const UEdGraphPin* Pin, TSet<UQuestlineNode_ContentBase*>& OutSources,
+                                               TSet<const UEdGraphNode*>& Visited)
 {
 	if (!Pin) return;
 
@@ -305,7 +307,7 @@ void UQuestlineGraphSchema::CollectSourceQuests(const UEdGraphPin* Pin, TSet<UQu
 		if (KnotIn)
 		{
 			for (const UEdGraphPin* Linked : KnotIn->LinkedTo)
-				CollectSourceQuests(Linked, OutSources, Visited);
+				CollectSourceNodes(Linked, OutSources, Visited);
 		}
 	}
 }
@@ -353,12 +355,12 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 	{
 		// Exit Rule 1: a quest node may not have more than one output pin leading to the same exit node — trace back to all
 		// source quests and check their other outputs for an existing path to this exit
-		TSet<UQuestlineNode_Quest*> QuestSources;
+		TSet<UQuestlineNode_ContentBase*> QuestSources;
 		{
 			TSet<const UEdGraphNode*> Visited;
-			CollectSourceQuests(OutputPin, QuestSources, Visited);
+			CollectSourceNodes(OutputPin, QuestSources, Visited);
 		}
-		for (UQuestlineNode_Quest* QuestSourceNode : QuestSources)
+		for (UQuestlineNode_ContentBase* QuestSourceNode : QuestSources)
 		{
 			for (UEdGraphPin* SourcePin : QuestSourceNode->Pins)
 			{
@@ -385,18 +387,18 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 	// Lambda for checking upstream connections
 	auto CheckDuplicateSources = [&]() -> FPinConnectionResponse
 	{
-		TSet<UQuestlineNode_Quest*> IncomingSources;
+		TSet<UQuestlineNode_ContentBase*> IncomingSources;
 		{
 			TSet<const UEdGraphNode*> Visited;
-			CollectSourceQuests(OutputPin, IncomingSources, Visited);
+			CollectSourceNodes(OutputPin, IncomingSources, Visited);
 		}
 		if (IncomingSources.Num() > 0)
 		{
 			for (const UEdGraphPin* Existing : InputPin->LinkedTo)
 			{
-				TSet<UQuestlineNode_Quest*> ExistingSources;
+				TSet<UQuestlineNode_ContentBase*> ExistingSources;
 				TSet<const UEdGraphNode*> Visited;
-				CollectSourceQuests(Existing, ExistingSources, Visited);
+				CollectSourceNodes(Existing, ExistingSources, Visited);
 
 				if (int32 NumCollisions = IncomingSources.Intersect(ExistingSources).Num(); NumCollisions > 0)
 				{
@@ -421,10 +423,10 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 	// Lambda for checking downstream connections
 	auto CheckDownstreamParallelPaths = [&](const UEdGraphPin* KnotInputPin) -> FPinConnectionResponse
 	{
-		TSet<UQuestlineNode_Quest*> IncomingSources;
+		TSet<UQuestlineNode_ContentBase*> IncomingSources;
 		{
 			TSet<const UEdGraphNode*> Visited;
-			CollectSourceQuests(OutputPin, IncomingSources, Visited);
+			CollectSourceNodes(OutputPin, IncomingSources, Visited);
 		}
 		if (IncomingSources.Num() == 0)
 			return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, FText::GetEmpty());
@@ -440,9 +442,9 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 		{
 			for (const UEdGraphPin* Existing : Terminal->LinkedTo)
 			{
-				TSet<UQuestlineNode_Quest*> ExistingSources;
+				TSet<UQuestlineNode_ContentBase*> ExistingSources;
 				TSet<const UEdGraphNode*> Visited;
-				CollectSourceQuests(Existing, ExistingSources, Visited);
+				CollectSourceNodes(Existing, ExistingSources, Visited);
 				if (IncomingSources.Intersect(ExistingSources).Num() > 0)
 				{
 					return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
@@ -505,9 +507,16 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 	}
 	else
 	{
+		auto IsQuestLikeNode = [](const UEdGraphNode* Node) -> bool
+		{
+			return Cast<const UQuestlineNode_Quest>(Node)
+				|| Cast<const UQuestlineNode_Leaf>(Node)
+				|| Cast<const UQuestlineNode_LinkedQuestline>(Node);
+		};
+
 		if (OutputNode == InputNode)
 		{
-			if (Cast<const UQuestlineNode_Quest>(OutputNode) && InputPin->PinName == TEXT("Activate"))
+			if (IsQuestLikeNode(OutputNode) && InputPin->PinName == TEXT("Activate"))
 			{
 				return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, FText::GetEmpty());
 			}
@@ -517,7 +526,7 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 
 		if (Cast<const UQuestlineNode_Entry>(OutputNode))
 		{
-			if (!Cast<const UQuestlineNode_Quest>(InputNode))
+			if (!IsQuestLikeNode(InputNode))
 			{
 				return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
 					NSLOCTEXT("SimpleQuestEditor", "EntryOnlyToQuest", "Quest Start may only connect to a Quest node"));
@@ -529,9 +538,9 @@ const FPinConnectionResponse UQuestlineGraphSchema::CanCreateConnection(const UE
 			}
 		}
 
-		if (Cast<const UQuestlineNode_Quest>(OutputNode))
+		if (IsQuestLikeNode(OutputNode))
 		{
-			const bool bValidInput = Cast<const UQuestlineNode_Quest>(InputNode)
+			const bool bValidInput = IsQuestLikeNode(InputNode)
 								  || Cast<const UQuestlineNode_Knot>(InputNode)
 								  || Cast<const UQuestlineNode_Exit_Success>(InputNode)
 								  || Cast<const UQuestlineNode_Exit_Failure>(InputNode);
@@ -601,7 +610,30 @@ void UQuestlineGraphSchema::GetGraphContextActions(FGraphContextMenuBuilder& Con
 			const_cast<UEdGraph*>(ContextMenuBuilder.CurrentGraph));
 		ContextMenuBuilder.AddAction(Action);
 	}
+	
+	// Add Leaf node action
+	{
+		TSharedPtr<FEdGraphSchemaAction_NewNode> Action(new FEdGraphSchemaAction_NewNode(
+			FText::GetEmpty(),
+			NSLOCTEXT("SimpleQuestEditor", "AddLeafNode", "Add Quest Step"),
+			NSLOCTEXT("SimpleQuestEditor", "AddLeafNodeTooltip", "Add a Quest Step leaf node"),
+			0));
+		Action->NodeTemplate = NewObject<UQuestlineNode_Leaf>(
+			const_cast<UEdGraph*>(ContextMenuBuilder.CurrentGraph));
+		ContextMenuBuilder.AddAction(Action);
+	}
 
+	// Add Linked Questline node action
+	{
+		TSharedPtr<FEdGraphSchemaAction_NewNode> Action(new FEdGraphSchemaAction_NewNode(
+			FText::GetEmpty(),
+			NSLOCTEXT("SimpleQuestEditor", "AddLinkedNode", "Add Linked Questline"),
+			NSLOCTEXT("SimpleQuestEditor", "AddLinkedNodeTooltip", "Reference an external questline graph asset"),
+			0));
+		Action->NodeTemplate = NewObject<UQuestlineNode_LinkedQuestline>(
+			const_cast<UEdGraph*>(ContextMenuBuilder.CurrentGraph));
+		ContextMenuBuilder.AddAction(Action);
+	}
 }
 
 void UQuestlineGraphSchema::GetContextMenuActions(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const
@@ -628,7 +660,7 @@ FLinearColor UQuestlineGraphSchema::GetPinTypeColor(const FEdGraphPinType& PinTy
 bool UQuestlineGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) const
 {
 	UEdGraphPin* OutputPin = A->Direction == EGPD_Output ? A : B;
-	UEdGraphPin* InputPin  = A->Direction == EGPD_Input  ? A : B;
+	UEdGraphPin* InputPin = A->Direction == EGPD_Input ? A : B;
 
 	// Intercept self-loop: insert two knots to route the wire around the node
 	if (OutputPin->GetOwningNode() == InputPin->GetOwningNode() &&
@@ -649,17 +681,17 @@ bool UQuestlineGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) 
 			Knot->NodePosX = X;
 			Knot->NodePosY = Y;
 			Creator.Finalize();
-			if (UEdGraphPin* In  = Knot->FindPin(TEXT("KnotIn")))  In->PinType  = OutputPin->PinType;
+			if (UEdGraphPin* In = Knot->FindPin(TEXT("KnotIn"))) In->PinType = OutputPin->PinType;
 			if (UEdGraphPin* Out = Knot->FindPin(TEXT("KnotOut"))) Out->PinType = OutputPin->PinType;
 			return Knot;
 		};
 
 		UQuestlineNode_Knot* KnotRight = MakeKnot(QuestNode->NodePosX + NodeWidth, QuestNode->NodePosY - KnotOffset);
-		UQuestlineNode_Knot* KnotLeft  = MakeKnot(QuestNode->NodePosX,             QuestNode->NodePosY - KnotOffset);
+		UQuestlineNode_Knot* KnotLeft = MakeKnot(QuestNode->NodePosX, QuestNode->NodePosY - KnotOffset);
 
-		Super::TryCreateConnection(OutputPin,                          KnotRight->FindPin(TEXT("KnotIn")));
+		Super::TryCreateConnection(OutputPin, KnotRight->FindPin(TEXT("KnotIn")));
 		Super::TryCreateConnection(KnotRight->FindPin(TEXT("KnotOut")), KnotLeft->FindPin(TEXT("KnotIn")));
-		Super::TryCreateConnection(KnotLeft->FindPin(TEXT("KnotOut")),  InputPin);
+		Super::TryCreateConnection(KnotLeft->FindPin(TEXT("KnotOut")), InputPin);
 
 		return true;
 	}

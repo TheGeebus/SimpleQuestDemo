@@ -8,7 +8,7 @@
 #include "QuestlineGraphSchema.generated.h"
 
 struct FGraphPanelPinConnectionFactory;
-class UQuestlineNode_Quest;
+class UQuestlineNode_ContentBase;
 
 
 UCLASS()
@@ -21,7 +21,8 @@ public:
 	virtual void CreateDefaultNodesForGraph(UEdGraph& Graph) const override;
 
 	// Helper that checks for connected quest source nodes when establishing a connection, through branching reroutes as needed 
-	static void CollectSourceQuests(const UEdGraphPin* Pin, TSet<UQuestlineNode_Quest*>& OutSources, TSet<const UEdGraphNode*>& Visited);
+	static void CollectSourceNodes(const UEdGraphPin* Pin, TSet<UQuestlineNode_ContentBase*>& OutSources, TSet<const UEdGraphNode*>& Visited);
+	
 	// Helper to find destination input pins of a given output pin, through branching reroutes as needed
 	static void CollectDownstreamTerminalInputs(const UEdGraphPin* KnotOutPin, TArray<const UEdGraphPin*>& OutTerminalPins, TSet<const UEdGraphNode*>& Visited);
 		

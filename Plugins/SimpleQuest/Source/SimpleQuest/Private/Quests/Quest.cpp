@@ -97,7 +97,7 @@ void UQuest::CheckQuestTarget(UObject* InQuestTargetObject)
 	{
 		if (!IsValid(ObjectivePair.Value)) continue;
 		
-		const FQuestStep& Step = QuestSteps[ObjectivePair.Key];
+		const FQuestStepStruct& Step = QuestSteps[ObjectivePair.Key];
 		// Check for completion of all prerequisite quest steps
 		if (Step.PrerequisiteSteps.IsEmpty())
 		{
@@ -143,7 +143,7 @@ void UQuest::CheckQuestTarget(UObject* InQuestTargetObject)
 
 void UQuest::UpdateQuestCounter(int32 InStepID, int32 NewDisplayAmount)
 {
-	FQuestStep* Step = &QuestSteps[InStepID];
+	FQuestStepStruct* Step = &QuestSteps[InStepID];
 	if (Step != nullptr)
 	{
 		Step->QuestWidgetText.CounterCurrentValue = NewDisplayAmount;
@@ -156,7 +156,7 @@ void UQuest::ActivateQuestObjective(const int32 InStepID)
 {
 	OnQuestStepStarted.ExecuteIfBound(this, InStepID);
 	UQuestObjective* Objective = FindLoadedQuestObjective(InStepID);
-	FQuestStep* Step = &QuestSteps[InStepID];
+	FQuestStepStruct* Step = &QuestSteps[InStepID];
 	if (Objective)
 	{
 		if (Step)
@@ -216,7 +216,7 @@ void UQuest::StartQuestStep(int32 InQuestStepID)
 
 	if (!CurrentActiveSteps.Contains(InQuestStepID))
 	{
-		if (FQuestStep* Step = &QuestSteps[InQuestStepID])
+		if (FQuestStepStruct* Step = &QuestSteps[InQuestStepID])
 		{
 			// Load the QuestObjective object, binding the necessary events.
 			if (LoadQuestObjective(InQuestStepID))
@@ -235,7 +235,7 @@ void UQuest::StartQuestStep(int32 InQuestStepID)
 void UQuest::StepFinished_Implementation(int32 CompletedStepID, bool bDidSucceed)
 {
 	// Get a reference to the completed step
-	FQuestStep* Step = &QuestSteps[CompletedStepID];
+	FQuestStepStruct* Step = &QuestSteps[CompletedStepID];
 
 	// Flag as completed
 	Step->bStepCompleted = true;

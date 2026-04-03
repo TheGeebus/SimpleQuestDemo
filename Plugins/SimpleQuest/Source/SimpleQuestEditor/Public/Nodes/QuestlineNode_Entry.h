@@ -17,4 +17,7 @@ public:
 	virtual bool CanUserDeleteNode() const override { return false; }
 	virtual bool CanDuplicateNode() const override { return false; }
 
+	static const FName PinName_AnyOutcome;
+	static const FName PinName_Success;
+	static const FName PinName_Failure;
 };

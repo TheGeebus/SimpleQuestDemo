@@ -1,0 +1,26 @@
+﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "QuestlineNode_ContentBase.h"
+#include "QuestlineNode_LinkedQuestline.generated.h"
+
+class UQuestlineGraph;
+
+/**
+ * References an external UQuestlineGraph asset. Compiler-only — erased at compile time via bidirectional wiring pass.
+ * Has no corresponding runtime class.
+ */
+UCLASS()
+class SIMPLEQUESTEDITOR_API UQuestlineNode_LinkedQuestline : public UQuestlineNode_ContentBase
+{
+	GENERATED_BODY()
+
+public:
+	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
+
+	/** The external questline graph asset this node references. */
+	UPROPERTY(EditAnywhere, Category = "Quest")
+	TSoftObjectPtr<UQuestlineGraph> LinkedGraph;
+};

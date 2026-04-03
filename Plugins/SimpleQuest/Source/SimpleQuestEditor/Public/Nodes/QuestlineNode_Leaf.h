@@ -4,21 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "QuestlineNode_ContentBase.h"
-#include "Misc/Guid.h"
-#include "QuestlineNode_Quest.generated.h"
+#include "QuestlineNode_Leaf.generated.h"
 
-class UQuest;
+class UQuestStep;
 
 UCLASS()
-class SIMPLEQUESTEDITOR_API UQuestlineNode_Quest : public UQuestlineNode_ContentBase
+class SIMPLEQUESTEDITOR_API UQuestlineNode_Leaf : public UQuestlineNode_ContentBase
 {
 	GENERATED_BODY()
 
 public:
-
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 
-	// The quest class this node represents
+	/** The step class this node compiles into. */
 	UPROPERTY(EditAnywhere, Category = "Quest")
-	TSubclassOf<UQuest> QuestClass;
+	TSubclassOf<UQuestStep> StepClass;
+
 };

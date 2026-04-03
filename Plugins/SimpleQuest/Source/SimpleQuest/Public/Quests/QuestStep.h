@@ -13,7 +13,7 @@ class UQuestObjective;
  * once the unified graph model is fully in place.
  */
 UCLASS(Blueprintable)
-class SIMPLEQUEST_API UQuestStepNode : public UQuestNodeBase
+class SIMPLEQUEST_API UQuestStep : public UQuestNodeBase
 {
 	GENERATED_BODY()
 
