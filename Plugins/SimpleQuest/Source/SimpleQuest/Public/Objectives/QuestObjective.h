@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "QuestObjective.generated.h"
 
-class UQuestSignalSubsystem;
 class UQuestTargetInterface;
 class IQuestTargetInterface;
 

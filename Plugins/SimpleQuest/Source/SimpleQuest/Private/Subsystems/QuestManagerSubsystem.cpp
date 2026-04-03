@@ -84,7 +84,7 @@ void UQuestManagerSubsystem::RegisterQuestGiver(const FQuestRegistrationEvent& E
 	if (LoadedQuestClasses.Contains(QuestClass))
 	{
 		UE_LOG(LogSimpleQuest, Log, TEXT("UQuestManagerSubsystem::RegisterQuestGiver : enabling quest: %s"), *QuestClass->GetFName().ToString());
-		SetQuestEnabled(Event.QuestTag, QuestClass, true);
+		SetQuestEnabled(Event.GetQuestTag(), QuestClass, true);
 	}
 	if (!QuestGiverMap.Contains(QuestClass))
 	{

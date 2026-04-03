@@ -10,12 +10,15 @@ struct SIMPLECORE_API FSignalEventBase
 
 	FSignalEventBase() = default;
 
-	explicit FSignalEventBase(const FName InChannelObjectID)
-		: ChannelObjectID(InChannelObjectID) {}
+	explicit FSignalEventBase(const FName InChannelObjectID, FGameplayTag InEventTag)
+		: ChannelObjectID(InChannelObjectID)
+	{
+		EventTags.AddTag(InEventTag);
+	}
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName ChannelObjectID;
 	
 	UPROPERTY(BlueprintReadWrite)
-	FGameplayTag EventTag;
+	FGameplayTagContainer EventTags;
 };

@@ -16,10 +16,8 @@ struct SIMPLECORE_API FStateSatisfiedEvent : public FSignalEventBase
 	FStateSatisfiedEvent() = default;
 
 	explicit FStateSatisfiedEvent(const FGameplayTag InStateTag)
-		: FSignalEventBase(InStateTag.GetTagName()), StateTag(InStateTag)
-	{
-		EventTag = InStateTag;
-	}
+		: FSignalEventBase(InStateTag.GetTagName(), InStateTag)
+	{}
 
 	UPROPERTY(BlueprintReadWrite)
 	FGameplayTag StateTag;
@@ -33,10 +31,8 @@ struct SIMPLECORE_API FStateUnsatisfiedEvent : public FSignalEventBase
 	FStateUnsatisfiedEvent() = default;
 
 	explicit FStateUnsatisfiedEvent(const FGameplayTag InStateTag)
-		: FSignalEventBase(InStateTag.GetTagName()), StateTag(InStateTag)
-	{
-		EventTag = InStateTag;
-	}
+		: FSignalEventBase(InStateTag.GetTagName(), InStateTag)
+	{}
 
 	UPROPERTY(BlueprintReadWrite)
 	FGameplayTag StateTag;

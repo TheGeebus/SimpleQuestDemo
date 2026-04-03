@@ -65,16 +65,29 @@ void USignalSubsystem::PublishTyped(UObject* ChannelObject, const EventType& Eve
         DelegateCopy.Broadcast(EventCopy);
     }
 
-    FGameplayTag CurrentTag = Event.EventTag;
-    while (CurrentTag.IsValid())
+    // Events are FGameplayTagContainers because linked event graphs may have subscribers at both the parent and child levels,
+    // so we store a separate tag describing all the parent and child graph hierarchies in a tree.
+    // We want to walk all tag hierarchies, checking if we've already broadcast this exact event because tag hierarchies
+    // may have duplicates that represent branch nodes.
+    
+    TSet<FGameplayTag> VisitedTags;
+    for (const FGameplayTag& RootTag : Event.EventTags)
     {
-        if (auto* Delegate = TagChannels.Find(CurrentTag))
+        FGameplayTag CurrentTag = RootTag;
+        while (CurrentTag.IsValid())
         {
-            FSignalEventMulticast DelegateCopy = *Delegate;
-            DelegateCopy.Broadcast(EventCopy);
+            if (VisitedTags.Contains(CurrentTag)) break; // skip the event if we've visited the same tag on another root
+            VisitedTags.Add(CurrentTag);
+
+            if (auto* Delegate = TagChannels.Find(CurrentTag))
+            {
+                FSignalEventMulticast DelegateCopy = *Delegate;
+                DelegateCopy.Broadcast(EventCopy);
+            }
+            CurrentTag = CurrentTag.RequestDirectParent(); // walk up the hierarchy from tip to root, iterating parent for loop to next root in tag container when done
         }
-        CurrentTag = CurrentTag.RequestDirectParent();
     }
+
 }
 
 template <typename EventType, typename ListenerType>
