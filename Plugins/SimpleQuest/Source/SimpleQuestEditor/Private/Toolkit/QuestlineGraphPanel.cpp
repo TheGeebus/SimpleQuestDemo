@@ -6,6 +6,8 @@
 #include "Nodes/QuestlineNode_Knot.h"
 #include "Nodes/QuestlineNode_Exit_Success.h"
 #include "Nodes/QuestlineNode_Exit_Failure.h"
+#include "Nodes/QuestlineNode_Leaf.h"
+#include "Nodes/QuestlineNode_LinkedQuestline.h"
 #include "ScopedTransaction.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GraphEditorDragDropAction.h"
@@ -27,10 +29,12 @@ void SQuestlineGraphPanel::Construct(const FArguments& InArgs,
  *          Helpers
  *-------------------------------------------*/
 
-// Returns the offset to apply to the raw cursor graph position so the node's
-// primary input pin connector lands at the cursor, matching Blueprint behaviour.
-//   Regular nodes:  title bar ~24 + half pin-row ~12 = 36 down, pin nub ~8 right
-//   Knot node:      small control point ~16x16, so centre it on the cursor
+/**
+ * Returns the offset to apply to the raw cursor graph position so the node's primary input pin connector lands at the
+ * cursor, matching Blueprint behaviour.
+ * - Regular nodes: title bar ~24 + half pin-row ~12 = 36 down, pin nub ~8 right
+ * - Knot node: small control point ~16x16, so centre it on the cursor
+ */ 
 static FVector2D GetPinAlignmentOffset(FKey Key)
 {
     if (Key == EKeys::R) return FVector2D(-8.f, -8.f);
@@ -39,7 +43,8 @@ static FVector2D GetPinAlignmentOffset(FKey Key)
 
 bool SQuestlineGraphPanel::IsHotkey(FKey Key)
 {
-    return Key == EKeys::Q || Key == EKeys::S || Key == EKeys::F || Key == EKeys::R;
+    return Key == EKeys::Q || Key == EKeys::W || Key == EKeys::E
+        || Key == EKeys::R || Key == EKeys::S || Key == EKeys::F;
 }
 
 FVector2D SQuestlineGraphPanel::ToGraphCoords(const FGeometry& Geometry, FVector2D ScreenPos) const
@@ -70,9 +75,11 @@ UEdGraphNode* SQuestlineGraphPanel::SpawnNodeForKey(FKey Key, FVector2D GraphPos
 
     Graph->Modify();
     if (Key == EKeys::Q) return SpawnNode<UQuestlineNode_Quest>(GraphPos);
+    if (Key == EKeys::W) return SpawnNode<UQuestlineNode_Leaf>(GraphPos);
+    if (Key == EKeys::E) return SpawnNode<UQuestlineNode_LinkedQuestline>(GraphPos);
+    if (Key == EKeys::R) return SpawnNode<UQuestlineNode_Knot>(GraphPos);
     if (Key == EKeys::S) return SpawnNode<UQuestlineNode_Exit_Success>(GraphPos);
     if (Key == EKeys::F) return SpawnNode<UQuestlineNode_Exit_Failure>(GraphPos);
-    if (Key == EKeys::R) return SpawnNode<UQuestlineNode_Knot>(GraphPos);
     return nullptr;
 }
 
