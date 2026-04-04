@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
 #include "Toolkit/QuestlineGraphPanel.h"
+#include "Toolkit/QuestlineHierarchyPanel.h"
 #include "IDetailsView.h"
 #include "ISimpleQuestEditorModule.h"
 
@@ -52,4 +53,13 @@ private:
 
 	TSharedPtr<IDetailsView> DetailsView;
 	static const FName DetailsTabId;
+
+	/*-----------------------------------------------------------------------------------
+	 * Questline Hierarchy Panel
+	 *----------------------------------------------------------------------------------*/
+
+	TSharedRef<SDockTab> SpawnHierarchyTab(const FSpawnTabArgs& Args);
+
+	TSharedPtr<SQuestlineHierarchyPanel> HierarchyPanel;
+	static const FName HierarchyTabId;
 };

@@ -18,6 +18,7 @@
 
 const FName FQuestlineGraphEditor::GraphViewportTabId(TEXT("QuestlineGraphEditor_GraphViewport"));
 const FName FQuestlineGraphEditor::DetailsTabId(TEXT("QuestlineGraphEditor_Details"));
+const FName FQuestlineGraphEditor::HierarchyTabId(TEXT("QuestlineGraphEditor_Hierarchy"));
 
 
 FQuestlineGraphEditor::~FQuestlineGraphEditor() = default;
@@ -26,16 +27,28 @@ void FQuestlineGraphEditor::InitQuestlineGraphEditor(const EToolkitMode::Type Mo
 {
     QuestlineGraph = InQuestlineGraph;
 
-    const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("QuestlineGraphEditor_Layout_v3")
+    const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("QuestlineGraphEditor_Layout_v4")
         ->AddArea
         (
             FTabManager::NewPrimaryArea()
             ->SetOrientation(Orient_Horizontal)
             ->Split
             (
-                FTabManager::NewStack()
+                FTabManager::NewSplitter()
+                ->SetOrientation(Orient_Vertical)
                 ->SetSizeCoefficient(0.15f)
-                ->AddTab(DetailsTabId, ETabState::OpenedTab)
+                ->Split
+                (
+                    FTabManager::NewStack()
+                    ->SetSizeCoefficient(0.4f)
+                    ->AddTab(HierarchyTabId, ETabState::OpenedTab)
+                )
+                ->Split
+                (
+                    FTabManager::NewStack()
+                    ->SetSizeCoefficient(0.6f)
+                    ->AddTab(DetailsTabId, ETabState::OpenedTab)
+                )
             )
             ->Split
             (
@@ -97,6 +110,11 @@ void FQuestlineGraphEditor::RegisterTabSpawners(const TSharedRef<FTabManager>& I
         DetailsTabId,
         FOnSpawnTab::CreateSP(this, &FQuestlineGraphEditor::SpawnDetailsTab))
         .SetDisplayName(NSLOCTEXT("SimpleQuestEditor", "DetailsTab", "Details"));
+
+    InTabManager->RegisterTabSpawner(
+        HierarchyTabId,
+        FOnSpawnTab::CreateSP(this, &FQuestlineGraphEditor::SpawnHierarchyTab))
+        .SetDisplayName(NSLOCTEXT("SimpleQuestEditor", "HierarchyTab", "Hierarchy"));
 }
 
 void FQuestlineGraphEditor::UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
@@ -104,6 +122,7 @@ void FQuestlineGraphEditor::UnregisterTabSpawners(const TSharedRef<FTabManager>&
     FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
     InTabManager->UnregisterTabSpawner(GraphViewportTabId);
     InTabManager->UnregisterTabSpawner(DetailsTabId);
+    InTabManager->UnregisterTabSpawner(HierarchyTabId);
 }
 
 TSharedRef<SDockTab> FQuestlineGraphEditor::SpawnGraphViewportTab(const FSpawnTabArgs& Args)
@@ -178,6 +197,8 @@ void FQuestlineGraphEditor::CompileQuestlineGraph()
     Info.ExpireDuration = 3.f;
     Info.bUseSuccessFailIcons = true;
     FSlateNotificationManager::Get().AddNotification(Info)->SetCompletionState(bSuccess ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
+
+    if (bSuccess && HierarchyPanel.IsValid()) HierarchyPanel->Refresh();
 }
 
 void FQuestlineGraphEditor::SaveAsset_Execute()
@@ -222,5 +243,16 @@ void FQuestlineGraphEditor::OnGraphSelectionChanged(const FGraphPanelSelectionSe
         Selected.Add(Obj);
 
     DetailsView->SetObjects(Selected);
+}
+
+TSharedRef<SDockTab> FQuestlineGraphEditor::SpawnHierarchyTab(const FSpawnTabArgs& Args)
+{
+    HierarchyPanel = SNew(SQuestlineHierarchyPanel, QuestlineGraph);
+
+    return SNew(SDockTab)
+        .Label(NSLOCTEXT("SimpleQuestEditor", "HierarchyTabLabel", "Hierarchy"))
+        [
+            HierarchyPanel.ToSharedRef()
+        ];
 }
 

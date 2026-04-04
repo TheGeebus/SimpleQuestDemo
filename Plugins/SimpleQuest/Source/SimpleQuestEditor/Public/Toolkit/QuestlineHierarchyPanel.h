@@ -32,7 +32,7 @@ public:
 private:
 	void RebuildTree();
 	TSharedRef<ITableRow> GenerateRow(TSharedPtr<FQuestlineHierarchyItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
-	void GetChildren(TSharedPtr<FQuestlineHierarchyItem> Item, TArray<TSharedPtr<FQuestlineHierarchyItem>>& OutChildren);
+	void GetChildQuestlineItems(TSharedPtr<FQuestlineHierarchyItem> Item, TArray<TSharedPtr<FQuestlineHierarchyItem>>& OutChildren);
 
 	TObjectPtr<UQuestlineGraph> QuestlineGraph;
 	TArray<TSharedPtr<FQuestlineHierarchyItem>> RootItems;
