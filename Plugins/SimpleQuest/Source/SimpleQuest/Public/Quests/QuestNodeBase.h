@@ -27,6 +27,9 @@ public:
      * to add activation behavior.
      */
     virtual void Activate(FGameplayTag InContextualTag);
+    
+    /** Resolve a raw, editor-time FName tag created by the graph compiler into the registered runtime FGameplayTag */
+    void ResolveQuestTag(FName TagName);
 
 protected:
     /**
@@ -54,11 +57,11 @@ protected:
 
     /** Tags of nodes to activate on successful completion. Compiler-written. */
     UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
-    TSet<FGameplayTag> NextNodesOnSuccess;
+    TSet<FName> NextNodesOnSuccess;
 
     /** Tags of nodes to activate on failed completion. Compiler-written. */
     UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
-    TSet<FGameplayTag> NextNodesOnFailure;
+    TSet<FName> NextNodesOnFailure;
 
     /**
      * Prerequisite tags that must be satisfied before this node can be started. Compiler-written from connected Prereq
@@ -67,7 +70,7 @@ protected:
      * Format: QuestPrereq.*
      */
     UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
-    TArray<FGameplayTag> PrereqTags;
+    TArray<FName> PrereqTags;
 
     /** Reward granted on completion of this node. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
@@ -92,8 +95,8 @@ public:
     FORCEINLINE FGameplayTag GetQuestTag() const { return QuestTag; }
     FORCEINLINE FGameplayTag GetContextualTag() const { return ContextualTag; }
     FORCEINLINE void SetContextualTag(const FGameplayTag InTag) { ContextualTag = InTag; }
-    FORCEINLINE const TSet<FGameplayTag>& GetNextNodesOnSuccess() const { return NextNodesOnSuccess; }
-    FORCEINLINE const TSet<FGameplayTag>& GetNextNodesOnFailure() const { return NextNodesOnFailure; }
+    FORCEINLINE const TSet<FName>& GetNextNodesOnSuccess() const { return NextNodesOnSuccess; }
+    FORCEINLINE const TSet<FName>& GetNextNodesOnFailure() const { return NextNodesOnFailure; }
     FORCEINLINE bool DoesCompleteParentGraph() const { return bCompletesParentGraph; }
     FORCEINLINE bool IsGiverGated() const { return bGiverGated; }
     

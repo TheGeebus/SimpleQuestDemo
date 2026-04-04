@@ -25,31 +25,29 @@ class SIMPLEQUEST_API UQuestlineGraph : public UObject
     friend class FQuestlineGraphCompiler;
     friend class UQuestManagerSubsystem;
 
-public:
-    virtual void PostLoad() override;
-
-
 private:
     /**
      * The tags representing the quests on this graph. Used for runtime lookups and event dispatch. Uses FName because we will
-     * need to register these on PostLoad.
+     * need to register these on game start.
      */
     UPROPERTY()
     TArray<FName> CompiledQuestTags;
 
     /**
      * Tags of all content nodes directly reachable from this questline's Entry node. Populated by the compiler. Used by the
-     * subsystem to know which nodes to activate when starting this questline.
+     * subsystem to know which nodes to activate when starting this questline. This is created at graph compilation time, so we
+     * use FName because FGameplayTag is unreliable in an editor context. 
      */
     UPROPERTY()
-    TArray<FGameplayTag> EntryNodeTags;
+    TArray<FName> EntryNodeTags;
 
     /**
      * All compiled node instances, keyed by tag. Owned by this asset. Populated by the compiler — includes nodes inlined from
-     * linked questline graphs. The subsystem looks up and activates nodes directly from this map.
+     * linked questline graphs. The subsystem looks up and activates nodes directly from this map. This is created at graph
+     * compilation time, so we use FName because FGameplayTag is unreliable in an editor context.
      */
     UPROPERTY()
-    TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> CompiledNodes;
+    TMap<FName, TObjectPtr<UQuestNodeBase>> CompiledNodes;
 
     /**
      * Identifier used as the Gameplay Tag scope for all quests in this questline. Must be unique across the project. Defaults
@@ -65,8 +63,9 @@ private:
 
 
 public:
-    const TArray<FGameplayTag>& GetEntryNodeTags() const { return EntryNodeTags; }
-    const TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>>& GetCompiledNodes() const { return CompiledNodes; }
+    const TArray<FName>& GetEntryNodeTags() const { return EntryNodeTags; }
+    const TMap<FName, TObjectPtr<UQuestNodeBase>>& GetCompiledNodes() const { return CompiledNodes; }
+    const TArray<FName>& GetCompiledQuestTags() const { return CompiledQuestTags; }
 
 
     // Editor-only: the actual UEdGraph object is only needed in the editor. The data it represents is compiled in-editor for use at runtime

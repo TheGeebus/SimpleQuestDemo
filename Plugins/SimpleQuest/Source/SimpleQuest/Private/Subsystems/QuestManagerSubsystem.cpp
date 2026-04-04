@@ -2,7 +2,6 @@
 
 
 #include "Subsystems/QuestManagerSubsystem.h"
-
 #include "Interfaces/QuestGiverInterface.h"
 #include "Quests/Quest.h"
 #include "Quests/QuestlineGraph.h"
@@ -21,6 +20,7 @@
 #include "Interfaces/QuestTargetInterface.h"
 #include "Interfaces/QuestWatcherInterface.h"
 #include "Signals/SignalSubsystem.h"
+#include "GameplayTagsManager.h"
 
 
 void UQuestManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -498,14 +498,15 @@ void UQuestManagerSubsystem::CompleteQuest(UQuest* CompletedQuest, bool bDidSucc
 		CompletedQuestClasses.Remove(Quest.LoadSynchronous());
 	}
 
-	const TSet<FGameplayTag>& NextNodeTags = bDidSucceed ? CompletedQuest->GetNextNodesOnSuccess() : CompletedQuest->GetNextNodesOnFailure();
-	if (!NextNodeTags.IsEmpty())
+	const TSet<FName>& NextNodeNames = bDidSucceed ? CompletedQuest->GetNextNodesOnSuccess() : CompletedQuest->GetNextNodesOnFailure();
+	if (!NextNodeNames.IsEmpty())
 	{
-		for (const FGameplayTag& Tag : NextNodeTags)
+		for (const FName& TagName : NextNodeNames)
 		{
-			ActivateNodeByTag(Tag);
+			ActivateNodeByTag(TagName);
 		}
 	}
+
 	else
 	{
 		// Legacy fallback: quests authored before the tag-based compiler wrote NextNodesOnSuccess/Failure
@@ -549,28 +550,36 @@ void UQuestManagerSubsystem::OnQuestTargetEnabledEvent(UQuest* InQuest, UObject*
 
 void UQuestManagerSubsystem::ActivateQuestlineGraph(UQuestlineGraph* Graph)
 {
-    if (!Graph) return;
+	if (!Graph) return;
 
-    for (const auto& Pair : Graph->GetCompiledNodes())
-    {
-        LoadedNodeInstances.Add(Pair.Key, Pair.Value);
-    }
+	UGameplayTagsManager& TM = UGameplayTagsManager::Get();
+	for (const auto& Pair : Graph->GetCompiledNodes())
+	{
+		if (UQuestNodeBase* Instance = Pair.Value)
+		{
+			Instance->ResolveQuestTag(Pair.Key);
+			LoadedNodeInstances.Add(Pair.Key, Instance);
+		}
+	}
 
-    for (const FGameplayTag& EntryTag : Graph->GetEntryNodeTags())
-    {
-        ActivateNodeByTag(EntryTag);
-    }
+	for (const FName& EntryTagName : Graph->GetEntryNodeTags())
+	{
+		ActivateNodeByTag(EntryTagName);
+	}
 }
 
-void UQuestManagerSubsystem::ActivateNodeByTag(FGameplayTag NodeTag)
+void UQuestManagerSubsystem::ActivateNodeByTag(FName NodeTagName)
 {
-	TObjectPtr<UQuestNodeBase>* InstancePtr = LoadedNodeInstances.Find(NodeTag);
+	TObjectPtr<UQuestNodeBase>* InstancePtr = LoadedNodeInstances.Find(NodeTagName);
 	if (!InstancePtr || !*InstancePtr)
 	{
-		UE_LOG(LogSimpleQuest, Warning, TEXT("UQuestManagerSubsystem::ActivateNodeByTag : no instance found for tag '%s'"), *NodeTag.ToString());
+		UE_LOG(LogSimpleQuest, Warning,
+			TEXT("UQuestManagerSubsystem::ActivateNodeByTag : no instance found for tag name '%s'"),
+			*NodeTagName.ToString());
 		return;
 	}
 
+	const FGameplayTag NodeTag = UGameplayTagsManager::Get().RequestGameplayTag(NodeTagName, false);
 	(*InstancePtr)->Activate(NodeTag);
 }
 
@@ -578,9 +587,13 @@ void UQuestManagerSubsystem::ChainToNextNodes(UQuestNodeBase* CompletedNode, boo
 {
 	if (!CompletedNode) return;
 
-	const TSet<FGameplayTag>& NextTags = bDidSucceed ? CompletedNode->GetNextNodesOnSuccess() : CompletedNode->GetNextNodesOnFailure();
-	for (const FGameplayTag& Tag : NextTags)
+	const TSet<FName>& NextTagNames = bDidSucceed
+		? CompletedNode->GetNextNodesOnSuccess()
+		: CompletedNode->GetNextNodesOnFailure();
+
+	for (const FName& TagName : NextTagNames)
 	{
-		ActivateNodeByTag(Tag);
+		ActivateNodeByTag(TagName);
 	}
 }
+

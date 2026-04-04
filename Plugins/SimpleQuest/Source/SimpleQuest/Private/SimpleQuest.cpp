@@ -1,9 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SimpleQuest.h"
-
+#include "GameplayTagsManager.h"
 #include "SimpleQuestLog.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Quests/QuestlineGraph.h"
 
 #define LOCTEXT_NAMESPACE "FSimpleQuestModule"
 
@@ -11,14 +14,35 @@ DEFINE_LOG_CATEGORY(LogSimpleQuest);
 
 void FSimpleQuestModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+	UGameplayTagsManager::OnLastChanceToAddNativeTags().AddStatic(&FSimpleQuestModule::RegisterCompiledQuestTags);
+}
 
+void FSimpleQuestModule::RegisterCompiledQuestTags()
+{
+	// Enumerate all UQuestlineGraph assets via the asset registry — no full loads
+	IAssetRegistry& AR = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+
+	TArray<FAssetData> Assets;
+	AR.GetAssetsByClass(UQuestlineGraph::StaticClass()->GetClassPathName(), Assets);
+
+	UGameplayTagsManager& TagsManager = UGameplayTagsManager::Get();
+	for (const FAssetData& Asset : Assets)
+	{
+		// Load the asset to read CompiledQuestTags — this is acceptable here
+		// because it fires before DoneAddingNativeTags, at a defined startup point
+		if (UQuestlineGraph* Graph = Cast<UQuestlineGraph>(Asset.GetAsset()))
+		{
+			for (const FName& TagName : Graph->GetCompiledQuestTags())
+			{
+				TagsManager.AddNativeGameplayTag(TagName);
+			}
+		}
+	}
 }
 
 void FSimpleQuestModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+
 }
 
 #undef LOCTEXT_NAMESPACE

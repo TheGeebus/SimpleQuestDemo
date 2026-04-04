@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayTagContainer.h"
 
 class UQuestlineGraph;
 class UQuestlineNode_ContentBase;
@@ -45,8 +44,8 @@ protected:
 	 * @param VisitedAssetPaths		Stack of asset paths currently open in the recursion, used for cycle detection.
 	 * @return						Tags of the content nodes directly reachable from this graph's Entry node.
 	 */
-	virtual TArray<FGameplayTag> CompileGraph(UQuestlineGraph* Graph, const FString& TagPrefix,	const TArray<FGameplayTag>& SuccessBoundaryTags,
-		const TArray<FGameplayTag>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths);
+	virtual TArray<FName> CompileGraph(UQuestlineGraph* Graph, const FString& TagPrefix,	const TArray<FName>& SuccessBoundaryTags,
+		const TArray<FName>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths);
 	
 	/**
 	 * Follows an output pin through knots, exit nodes, and linked questline nodes, collecting the gameplay tags of all terminal
@@ -61,8 +60,8 @@ protected:
 	 * @param VisitedAssetPaths		Cycle detection stack, shared with CompileGraph.
 	 * @param OutTags				Accumulates the resolved tags.
 	 */
-	virtual void ResolvePinToTags(UEdGraphPin* FromPin,	const FString& TagPrefix, const TArray<FGameplayTag>& SuccessBoundaryTags,
-		const TArray<FGameplayTag>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths, TArray<FGameplayTag>& OutTags);
+	virtual void ResolvePinToTags(UEdGraphPin* FromPin,	const FString& TagPrefix, const TArray<FName>& SuccessBoundaryTags,
+		const TArray<FName>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths, TArray<FName>& OutTags);
 	
 	/**
 	 * Sanitizes a designer-entered node label into a valid Gameplay Tag segment. Replaces spaces and invalid characters with
@@ -83,7 +82,10 @@ protected:
 	bool bHasErrors = false;
 
 	/** Accumulates all compiled node classes across the full recursive compilation run. Written to the top-level graph by Compile(). */
-	TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> AllCompiledNodes;
+	TMap<FName, TObjectPtr<UQuestNodeBase>> AllCompiledNodes;
+
+	/** Accumulates all compiled quest tags across the full recursive compilation run. Written to the top-level graph by Compile(). */
+	TArray<FName> AllCompiledQuestTags;	
 
 	/**
 	 * Rules for moving between nodes. Subclass and register via ISimpleQuestEditorModule interface to override classification logic.
@@ -91,6 +93,11 @@ protected:
 	 * For creating new node types, prefer to subclass UQuestlineNodeBase and override internal classification methods such as IsExitNode, etc.
 	 */
 	TUniquePtr<FQuestlineGraphTraversalPolicy> TraversalPolicy;
+
+private:
+	void SyncTagDataTable(UQuestlineGraph* InGraph);
+
+	UQuestlineGraph* RootGraph = nullptr;
 
 
 };

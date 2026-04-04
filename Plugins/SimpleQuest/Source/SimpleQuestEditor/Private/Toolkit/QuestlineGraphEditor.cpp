@@ -40,13 +40,13 @@ void FQuestlineGraphEditor::InitQuestlineGraphEditor(const EToolkitMode::Type Mo
                 ->Split
                 (
                     FTabManager::NewStack()
-                    ->SetSizeCoefficient(0.4f)
+                    ->SetSizeCoefficient(0.6f)
                     ->AddTab(HierarchyTabId, ETabState::OpenedTab)
                 )
                 ->Split
                 (
                     FTabManager::NewStack()
-                    ->SetSizeCoefficient(0.6f)
+                    ->SetSizeCoefficient(0.4f)
                     ->AddTab(DetailsTabId, ETabState::OpenedTab)
                 )
             )

@@ -30,7 +30,7 @@ void SQuestlineHierarchyPanel::RebuildTree()
     RootItems.Empty();
     if (!QuestlineGraph) return;
 
-    const TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>>& CompiledNodes = QuestlineGraph->GetCompiledNodes();
+    const TMap<FName, TObjectPtr<UQuestNodeBase>>& CompiledNodes = QuestlineGraph->GetCompiledNodes();
     if (CompiledNodes.IsEmpty()) return;
 
     // Build a flat item map keyed by tag FName
@@ -42,20 +42,20 @@ void SQuestlineHierarchyPanel::RebuildTree()
         Item->Node = Pair.Value;
 
         // Display name = last dot-separated segment of the tag
-        const FString TagStr = Pair.Key.GetTagName().ToString();
+        const FString TagStr = Pair.Key.ToString();
         FString Ignored, LastSegment;
         if (!TagStr.Split(TEXT("."), &Ignored, &LastSegment, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
             LastSegment = TagStr;
         Item->DisplayName = LastSegment;
 
-        ItemMap.Add(Pair.Key.GetTagName(), Item);
+        ItemMap.Add(Pair.Key, Item);
     }
 
     // Attach each item to its parent, or promote to root if the parent isn't in CompiledNodes
     for (const auto& ItemPair : ItemMap)
     {
         const TSharedPtr<FQuestlineHierarchyItem>& Item = ItemPair.Value;
-        const FString TagStr = Item->Tag.GetTagName().ToString();
+        const FString TagStr = Item->Tag.ToString();
 
         FString ParentStr, LastSeg;
         if (TagStr.Split(TEXT("."), &ParentStr, &LastSeg, ESearchCase::IgnoreCase, ESearchDir::FromEnd))

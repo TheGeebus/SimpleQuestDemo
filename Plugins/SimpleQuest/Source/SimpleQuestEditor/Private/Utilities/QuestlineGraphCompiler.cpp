@@ -1,6 +1,9 @@
 ﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
 
 #include "Utilities/QuestlineGraphCompiler.h"
+
+#include "GameplayTagsManager.h"
+#include "SimpleQuestLog.h"
 #include "Quests/QuestlineGraph.h"
 #include "Quests/QuestNodeBase.h"
 #include "Quests/QuestStep.h"
@@ -16,10 +19,14 @@
 #include "Utilities/QuestlineGraphTraversalPolicy.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
-#include "GameplayTagsManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Objectives/QuestObjective.h"
 #include "Rewards/QuestReward.h"
+#include "Engine/DataTable.h"
+#include "GameplayTagsSettings.h"
+#include "Factories/DataTableFactory.h"
+#include "AssetToolsModule.h"
+
 
 
 FQuestlineGraphCompiler::FQuestlineGraphCompiler()
@@ -43,6 +50,7 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
     }
 
     bHasErrors = false;
+    RootGraph = InGraph;
 
     // Derive the effective questline ID; designer override takes priority, asset name is the fallback
     const FString TagPrefix = SanitizeTagSegment(InGraph->QuestlineID.IsEmpty() ? InGraph->GetName() : InGraph->QuestlineID);
@@ -74,6 +82,8 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
     InGraph->CompiledNodes.Empty(); 
     InGraph->EntryNodeTags.Empty();
     AllCompiledNodes.Empty();
+    InGraph->CompiledQuestTags.Empty();
+    RootGraph = InGraph;
 
     // The graphs that have already been compiled. Provided to CompileGraph, which forwards it to all recursive calls.
     TArray<FString> VisitedAssetPaths;
@@ -81,10 +91,13 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
 
     // Start recursive compilation, working forward from the Start node. This is the top level so there are no boundary tags to
     // pass in from a parent graph yet.
-    TArray<FGameplayTag> EntryTags = CompileGraph(InGraph, TagPrefix, {}, {}, VisitedAssetPaths);
+    TArray<FName> EntryTags = CompileGraph(InGraph, TagPrefix, {}, {}, VisitedAssetPaths);
     InGraph->EntryNodeTags = EntryTags;
     InGraph->CompiledNodes = MoveTemp(AllCompiledNodes);
-
+    InGraph->CompiledQuestTags = MoveTemp(AllCompiledQuestTags);
+    
+    SyncTagDataTable(InGraph);
+    
     return !bHasErrors;
 }
 
@@ -93,8 +106,8 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
 // CompileGraph — recursive
 // -------------------------------------------------------------------------------------------------
 
-TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Graph, const FString& TagPrefix, const TArray<FGameplayTag>& SuccessBoundaryTags,
-    const TArray<FGameplayTag>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths)
+TArray<FName> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Graph, const FString& TagPrefix, const TArray<FName>& SuccessBoundaryTags,
+    const TArray<FName>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths)
 {
     if (!Graph || !Graph->QuestlineEdGraph) return {};
 
@@ -132,7 +145,7 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
 
         if (Cast<UQuestlineNode_Quest>(ContentNode))
         {
-            Instance = NewObject<UQuestNode>(Graph);
+            Instance = NewObject<UQuestNode>(RootGraph);
         }
         else if (UQuestlineNode_Step* StepNode = Cast<UQuestlineNode_Step>(ContentNode))
         {
@@ -141,7 +154,7 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
                 AddError(FString::Printf(TEXT("[%s] Step node '%s' has no Objective Class assigned."), *TagPrefix, *Label));
                 continue;
             }
-            UQuestStep* StepInstance = NewObject<UQuestStep>(Graph);
+            UQuestStep* StepInstance = NewObject<UQuestStep>(RootGraph);
             StepInstance->QuestObjective = StepNode->ObjectiveClass;
             StepInstance->Reward = StepNode->RewardClass;
             StepInstance->TargetClass = StepNode->TargetClass;
@@ -155,11 +168,8 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
 
         Instance->QuestContentGuid = ContentNode->QuestGuid;
         const FName TagName = MakeNodeTagName(TagPrefix, Label);
-        UGameplayTagsManager::Get().AddNativeGameplayTag(TagName);
-        Instance->QuestTag = UGameplayTagsManager::Get().RequestGameplayTag(TagName);
-        Graph->CompiledQuestTags.Add(TagName);
-
-        AllCompiledNodes.Add(Instance->QuestTag, Instance);
+        AllCompiledQuestTags.Add(TagName);
+        AllCompiledNodes.Add(TagName, Instance);
         NodeInstanceMap.Add(ContentNode, Instance);
     }
 
@@ -179,7 +189,7 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
         Instance->NextNodesOnSuccess.Empty();
         Instance->NextNodesOnFailure.Empty();
 
-        TArray<FGameplayTag> SuccessTags, FailureTags, AnyOutcomeTags;
+        TArray<FName> SuccessTags, FailureTags, AnyOutcomeTags;
 
         if (UEdGraphPin* SuccessPin = ContentNode->FindPin(TEXT("Success"), EGPD_Output))
         {
@@ -193,12 +203,12 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
         {
             ResolvePinToTags(AnyOutcomePin, TagPrefix, SuccessBoundaryTags, FailureBoundaryTags, VisitedAssetPaths, AnyOutcomeTags);
         }
-        for (const FGameplayTag& Tag : SuccessTags) Instance->NextNodesOnSuccess.Add(Tag);
-        for (const FGameplayTag& Tag : FailureTags) Instance->NextNodesOnFailure.Add(Tag);
-        for (const FGameplayTag& Tag : AnyOutcomeTags)
+        for (const FName& TagName : SuccessTags) Instance->NextNodesOnSuccess.Add(TagName);
+        for (const FName& TagName : FailureTags) Instance->NextNodesOnFailure.Add(TagName);
+        for (const FName& TagName : AnyOutcomeTags)
         {
-            Instance->NextNodesOnSuccess.Add(Tag);
-            Instance->NextNodesOnFailure.Add(Tag);
+            Instance->NextNodesOnSuccess.Add(TagName);
+            Instance->NextNodesOnFailure.Add(TagName);
         }
         // A node whose output chain reaches an exit should complete its parent graph on resolution
         UEdGraphPin* SuccessPin = ContentNode->FindPin(TEXT("Success"), EGPD_Output);
@@ -219,7 +229,7 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
 
     // ---- Resolve entry tags from the graph's Entry node ----
 
-    TArray<FGameplayTag> EntryTags;
+    TArray<FName> EntryTags;
     for (UEdGraphNode* Node : Graph->QuestlineEdGraph->Nodes)
     {
         if (!Cast<UQuestlineNode_Entry>(Node)) continue;
@@ -242,8 +252,8 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
 // ResolvePinToTags - the node traversal engine
 // -------------------------------------------------------------------------------------------------
 
-void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FString& TagPrefix, const TArray<FGameplayTag>& SuccessBoundaryTags,
-    const TArray<FGameplayTag>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths, TArray<FGameplayTag>& OutTags)
+void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FString& TagPrefix, const TArray<FName>& SuccessBoundaryTags,
+    const TArray<FName>& FailureBoundaryTags, TArray<FString>& VisitedAssetPaths, TArray<FName>& OutTags)
 {
     for (UEdGraphPin* LinkedPin : FromPin->LinkedTo)
     {
@@ -261,11 +271,11 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
         // Exit nodes: inject boundary tags for the parent graph so a child graph knows what its exits connect to on the parent level 
         else if (Cast<UQuestlineNode_Exit_Success>(Node))
         {
-            for (const FGameplayTag& Tag : SuccessBoundaryTags) OutTags.AddUnique(Tag);
+            for (const FName& Tag : SuccessBoundaryTags) OutTags.AddUnique(Tag);
         }
         else if (Cast<UQuestlineNode_Exit_Failure>(Node))
         {
-            for (const FGameplayTag& Tag : FailureBoundaryTags) OutTags.AddUnique(Tag);
+            for (const FName& Tag : FailureBoundaryTags) OutTags.AddUnique(Tag);
         }
 
         // LinkedQuestline: resolve its immediate downstream wiring as the linked graph's boundaries, then recurse
@@ -293,7 +303,7 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
 
             // What the linked graph's exit nodes should activate = what comes after the LinkedQuestline node in the parent graph.
             // Resolve those from the parent context before recursing.
-            TArray<FGameplayTag> LinkedSuccessBoundary, LinkedFailureBoundary;
+            TArray<FName> LinkedSuccessBoundary, LinkedFailureBoundary;
 
             if (UEdGraphPin* LinkedSuccessPin = LinkedNode->FindPin(TEXT("Success"), EGPD_Output))
             {
@@ -306,9 +316,9 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
             // AnyOutcome output feeds both boundary sets
             if (UEdGraphPin* LinkedAnyPin = LinkedNode->FindPin(TEXT("Any Outcome"), EGPD_Output))
             {
-                TArray<FGameplayTag> AnyTags;
+                TArray<FName> AnyTags;
                 ResolvePinToTags(LinkedAnyPin, TagPrefix, SuccessBoundaryTags, FailureBoundaryTags, VisitedAssetPaths, AnyTags);
-                for (const FGameplayTag& Tag : AnyTags)
+                for (const FName& Tag : AnyTags)
                 {
                     LinkedSuccessBoundary.AddUnique(Tag);
                     LinkedFailureBoundary.AddUnique(Tag);
@@ -316,19 +326,17 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
             }
 
             VisitedAssetPaths.Add(LinkedPath);
-            LinkedGraph->Modify();
-            LinkedGraph->CompiledQuestTags.Empty();
 
-            const FString LinkedPrefix = SanitizeTagSegment(LinkedGraph->QuestlineID.IsEmpty() ? LinkedGraph->GetName() : LinkedGraph->QuestlineID);
-
+            const FString LinkedPrefix = TagPrefix + TEXT(".") + SanitizeTagSegment(LinkedGraph->QuestlineID.IsEmpty() ? LinkedGraph->GetName() : LinkedGraph->QuestlineID);
+            
             // Recursion on the linked graph asset, providing the context gathered from this node's parent graph, including any context
             // that parent graph may have been provided by a parent graph of its own
-            TArray<FGameplayTag> LinkedEntryTags = CompileGraph(LinkedGraph, LinkedPrefix, LinkedSuccessBoundary, LinkedFailureBoundary, VisitedAssetPaths);
+            TArray<FName> LinkedEntryTags = CompileGraph(LinkedGraph, LinkedPrefix, LinkedSuccessBoundary, LinkedFailureBoundary, VisitedAssetPaths);
 
             VisitedAssetPaths.RemoveSingleSwap(LinkedPath);
 
             // The entry tags of the compiled linked graph are what "flows through" the LinkedQuestline node
-            for (const FGameplayTag& Tag : LinkedEntryTags)
+            for (const FName& Tag : LinkedEntryTags)
             {
                 OutTags.AddUnique(Tag);
             }
@@ -341,10 +349,9 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
             if (!Label.IsEmpty())
             {
                 const FName TagName = MakeNodeTagName(TagPrefix, Label);
-                const FGameplayTag Tag = UGameplayTagsManager::Get().RequestGameplayTag(TagName, false);
-                if (Tag.IsValid())
+                if (!TagName.IsNone())
                 {
-                    OutTags.AddUnique(Tag);
+                    OutTags.AddUnique(TagName);
                 }
             }
         }
@@ -382,3 +389,53 @@ void FQuestlineGraphCompiler::AddWarning(const FString& Message)
 {
     UE_LOG(LogTemp, Warning, TEXT("QuestlineGraphCompiler: %s"), *Message);
 }
+
+void FQuestlineGraphCompiler::SyncTagDataTable(UQuestlineGraph* InGraph)
+{
+    // Derive the DataTable asset path from the questline graph's package path
+    const FString GraphPackageName = InGraph->GetOutermost()->GetName();
+    const FString TablePackageName = GraphPackageName + TEXT("_Tags");
+    const FString TableAssetName   = FPackageName::GetLongPackageAssetName(TablePackageName);
+    const FString TablePackagePath = FPackageName::GetLongPackagePath(TablePackageName);
+
+    // Try to load existing DataTable; create it if this is the first compile
+    const FString TableObjectPath = TablePackageName + TEXT(".") + TableAssetName;
+    UDataTable* TagTable = LoadObject<UDataTable>(nullptr, *TableObjectPath);
+
+    if (!TagTable)
+    {
+        IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
+        UDataTableFactory* Factory = NewObject<UDataTableFactory>();
+        Factory->Struct = FGameplayTagTableRow::StaticStruct();
+        TagTable = Cast<UDataTable>(AssetTools.CreateAsset(TableAssetName, TablePackagePath, UDataTable::StaticClass(), Factory));
+
+        if (!TagTable)
+        {
+            AddError(FString::Printf(TEXT("Failed to create tag DataTable asset at '%s'."), *TablePackageName));
+            return;
+        }
+
+        // One-time registration with the tag manager settings
+        UGameplayTagsSettings* TagSettings = GetMutableDefault<UGameplayTagsSettings>();
+        const FSoftObjectPath TablePath(TagTable);
+        if (!TagSettings->GameplayTagTableList.Contains(TablePath))
+        {
+            TagSettings->GameplayTagTableList.Add(TablePath);
+            TagSettings->TryUpdateDefaultConfigFile();
+        }
+    }
+
+    // Repopulate rows from the freshly compiled tag list
+    TagTable->EmptyTable();
+    for (const FName& TagName : InGraph->CompiledQuestTags)
+    {
+        FGameplayTagTableRow Row;
+        Row.Tag = TagName;
+        TagTable->AddRow(TagName, Row);
+    }
+    TagTable->MarkPackageDirty();
+
+    // Rebuild the live tag tree so pickers see the new tags immediately
+    UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
+}
+

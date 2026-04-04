@@ -12,7 +12,7 @@ class UQuestNodeBase;
 
 struct FQuestlineHierarchyItem
 {
-	FGameplayTag Tag;
+	FName Tag;
 	FString DisplayName;
 	UQuestNodeBase* Node = nullptr;
 	TArray<TSharedPtr<FQuestlineHierarchyItem>> Children;

@@ -4,16 +4,6 @@
 #include "GameplayTagsManager.h"
 #include "UObject/AssetRegistryTagsContext.h"
 
-void UQuestlineGraph::PostLoad()
-{
-	Super::PostLoad();
-
-	UGameplayTagsManager& TagsManager = UGameplayTagsManager::Get();
-	for (const FName& TagName : CompiledQuestTags)
-	{
-		TagsManager.AddNativeGameplayTag(TagName);
-	}
-}
 
 void UQuestlineGraph::GetAssetRegistryTags(FAssetRegistryTagsContext Context) const
 {

@@ -166,7 +166,7 @@ protected:
 
 	/** Node instances from all loaded questline graph assets, keyed by tag. Populated by ActivateQuestlineGraph. */
 	UPROPERTY()
-	TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> LoadedNodeInstances;
+	TMap<FName, TObjectPtr<UQuestNodeBase>> LoadedNodeInstances;
 
 	/** Quick reference set of loaded quests. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LoadedQuests", meta = (AllowPrivateAccess = "true"))
@@ -196,7 +196,7 @@ protected:
 	virtual void ActivateQuestlineGraph(UQuestlineGraph* Graph);
 
 	/** Looks up the instance for NodeTag in LoadedNodeInstances and activates it. */
-	virtual void ActivateNodeByTag(FGameplayTag NodeTag);
+	virtual void ActivateNodeByTag(FName NodeTag);
 
 	/** Chains to next nodes after a node completes, using tag-based routing from NextNodesOnSuccess / NextNodesOnFailure. */
 	virtual void ChainToNextNodes(UQuestNodeBase* CompletedNode, bool bDidSucceed);
