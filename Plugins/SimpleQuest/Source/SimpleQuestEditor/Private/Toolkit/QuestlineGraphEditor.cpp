@@ -21,7 +21,13 @@ const FName FQuestlineGraphEditor::DetailsTabId(TEXT("QuestlineGraphEditor_Detai
 const FName FQuestlineGraphEditor::HierarchyTabId(TEXT("QuestlineGraphEditor_Hierarchy"));
 
 
-FQuestlineGraphEditor::~FQuestlineGraphEditor() = default;
+FQuestlineGraphEditor::~FQuestlineGraphEditor()
+{
+    if (QuestlineGraph && QuestlineGraph->QuestlineEdGraph)
+    {
+        QuestlineGraph->QuestlineEdGraph->RemoveOnGraphChangedHandler(OnGraphChangedHandle);
+    }
+}
 
 void FQuestlineGraphEditor::InitQuestlineGraphEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UQuestlineGraph* InQuestlineGraph)
 {
@@ -75,6 +81,8 @@ void FQuestlineGraphEditor::InitQuestlineGraphEditor(const EToolkitMode::Type Mo
         true,  // bCreateDefaultStandaloneMenu
         true,  // bCreateDefaultToolbar
         InQuestlineGraph);
+
+    OnGraphChangedHandle = InQuestlineGraph->QuestlineEdGraph->AddOnGraphChangedHandler(FOnGraphChanged::FDelegate::CreateSP(this, &FQuestlineGraphEditor::OnGraphChanged));
 }
 
 FName FQuestlineGraphEditor::GetToolkitFName() const
@@ -198,6 +206,8 @@ void FQuestlineGraphEditor::CompileQuestlineGraph()
     Info.bUseSuccessFailIcons = true;
     FSlateNotificationManager::Get().AddNotification(Info)->SetCompletionState(bSuccess ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
 
+    CompileStatus = bSuccess ? EQuestlineCompileStatus::UpToDate : EQuestlineCompileStatus::Error;
+
     if (bSuccess && HierarchyPanel.IsValid()) HierarchyPanel->Refresh();
 }
 
@@ -221,9 +231,43 @@ void FQuestlineGraphEditor::ExtendToolbar()
 void FQuestlineGraphEditor::FillToolbar(FToolBarBuilder& ToolbarBuilder)
 {
     ToolbarBuilder.BeginSection("Compile");
-    ToolbarBuilder.AddToolBarButton(FQuestlineGraphEditorCommands::Get().CompileQuestlineGraph);
+    ToolbarBuilder.AddToolBarButton(
+        FQuestlineGraphEditorCommands::Get().CompileQuestlineGraph,
+        NAME_None,
+        TAttribute<FText>(),
+        TAttribute<FText>(),
+        TAttribute<FSlateIcon>::CreateLambda(
+            [this]() -> FSlateIcon
+            {
+                return GetCompileStatusIcon();
+            })
+        );
     ToolbarBuilder.EndSection();
 }
+
+void FQuestlineGraphEditor::OnGraphChanged(const FEdGraphEditAction&)
+{
+    CompileStatus = EQuestlineCompileStatus::Unknown;
+}
+
+FSlateIcon FQuestlineGraphEditor::GetCompileStatusIcon() const
+{
+    static const FName Background("Blueprint.CompileStatus.Background");
+    static const FName Unknown("Blueprint.CompileStatus.Overlay.Unknown");
+    static const FName Good("Blueprint.CompileStatus.Overlay.Good");
+    static const FName Error("Blueprint.CompileStatus.Overlay.Error");
+
+    switch (CompileStatus)
+    {
+    case EQuestlineCompileStatus::UpToDate:
+        return FSlateIcon(FAppStyle::GetAppStyleSetName(), Background, NAME_None, Good);
+    case EQuestlineCompileStatus::Error:
+        return FSlateIcon(FAppStyle::GetAppStyleSetName(), Background, NAME_None, Error);
+    default:
+        return FSlateIcon(FAppStyle::GetAppStyleSetName(), Background, NAME_None, Unknown);
+    }
+}
+
 
 TSharedRef<SDockTab> FQuestlineGraphEditor::SpawnDetailsTab(const FSpawnTabArgs& Args)
 {

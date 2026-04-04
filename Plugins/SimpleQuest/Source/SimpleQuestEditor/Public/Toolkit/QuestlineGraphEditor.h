@@ -16,7 +16,7 @@ class SGraphEditor;
 class FQuestlineGraphEditor : public FAssetEditorToolkit
 {
 public:
-	~FQuestlineGraphEditor();
+	virtual ~FQuestlineGraphEditor() override;
 	void InitQuestlineGraphEditor(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UQuestlineGraph* InQuestlineGraph);
 
 	// FAssetEditorToolkit interface
@@ -38,6 +38,14 @@ private:
 	virtual void SaveAsset_Execute() override;
 	void ExtendToolbar();
 	void FillToolbar(FToolBarBuilder& ToolbarBuilder);
+
+	enum class EQuestlineCompileStatus : uint8 { Unknown, UpToDate, Error };
+
+	void OnGraphChanged(const FEdGraphEditAction& Action);
+	FSlateIcon GetCompileStatusIcon() const;
+
+	EQuestlineCompileStatus CompileStatus = EQuestlineCompileStatus::Unknown;
+	FDelegateHandle OnGraphChangedHandle;
 
 	TObjectPtr<UQuestlineGraph> QuestlineGraph;
 	TSharedPtr<SQuestlineGraphPanel> GraphEditorWidget;
