@@ -9,6 +9,7 @@ class UQuestlineGraph;
 class UQuestlineNode_ContentBase;
 class UQuestNodeBase;
 class UEdGraphPin;
+class FQuestlineGraphTraversalPolicy;
 
 /**
  * Compiles a UQuestlineGraph asset, walking the graph structure and writing derived data to each quest/step CDO.
@@ -25,6 +26,7 @@ class UEdGraphPin;
 class SIMPLEQUESTEDITOR_API FQuestlineGraphCompiler
 {
 public:
+	FQuestlineGraphCompiler();
 	virtual ~FQuestlineGraphCompiler() = default;
 
     /** Entry point. Validates the asset, then kicks off recursive graph compilation. Returns true if there were no errors. */
@@ -79,16 +81,17 @@ protected:
 	/** Accumulates all compiled node classes across the full recursive compilation run. Written to the top-level graph by Compile(). */
 	TMap<FGameplayTag, TSubclassOf<UQuestNodeBase>> AllCompiledNodeClasses;
 
+	/**
+	 * Rules for moving between nodes. Subclass and register via ISimpleQuestEditorModule interface to override classification logic.
+	 * 
+	 * For creating new node types, prefer to subclass UQuestlineNodeBase and override internal classification methods such as IsExitNode, etc.
+	 */
+	TUniquePtr<FQuestlineGraphTraversalPolicy> TraversalPolicy;
+
 private:
 	/**
 	 * Returns the UQuestNodeBase CDO for a Quest or Leaf content node. Returns null for LinkedQuestline nodes (compiler-only,
 	 * no runtime class) and for Quest/Leaf nodes with no class assigned.
 	 */
 	UQuestNodeBase* GetCDOForContentNode(UQuestlineNode_ContentBase* ContentNode) const;
-
-	/**
-	 * Returns true if following the output pin through any knot chain leads directly to an Exit node. Used to determine whether
-	 * bCompletesParentGraph should be set on a content node's CDO.
-	 */
-	static bool PinLeadsToExit(UEdGraphPin* FromPin);
 };

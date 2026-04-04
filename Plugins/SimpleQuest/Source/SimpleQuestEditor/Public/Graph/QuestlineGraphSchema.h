@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
 #include "EdGraph/EdGraphSchema.h"
+#include "Utilities/QuestlineGraphTraversalPolicy.h"
 #include "QuestlineGraphSchema.generated.h"
 
 struct FGraphPanelPinConnectionFactory;
@@ -17,27 +18,24 @@ class SIMPLEQUESTEDITOR_API UQuestlineGraphSchema : public UEdGraphSchema
 	GENERATED_BODY()
 
 public:
-	// Called when the graph is first created — populates it with the entry node
-	virtual void CreateDefaultNodesForGraph(UEdGraph& Graph) const override;
-
-	// Helper that checks for connected quest source nodes when establishing a connection, through branching reroutes as needed 
-	static void CollectSourceNodes(const UEdGraphPin* Pin, TSet<UQuestlineNode_ContentBase*>& OutSources, TSet<const UEdGraphNode*>& Visited);
+	UQuestlineGraphSchema();
 	
-	// Helper to find destination input pins of a given output pin, through branching reroutes as needed
-	static void CollectDownstreamTerminalInputs(const UEdGraphPin* KnotOutPin, TArray<const UEdGraphPin*>& OutTerminalPins, TSet<const UEdGraphNode*>& Visited);
+	/** Called when the graph is first created — populates it with the entry node */
+	virtual void CreateDefaultNodesForGraph(UEdGraph& Graph) const override;
 		
-	// Determines whether a connection between two pins is valid
+	/** Determines whether a connection between two pins is valid */
 	virtual const FPinConnectionResponse CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const override;
 
-	// Populates the right-click context menu for the graph background
+	/** Populates the right-click context menu for the graph background */
 	virtual void GetGraphContextActions(FGraphContextMenuBuilder& ContextMenuBuilder) const override;
 
-	// Populates the right-click context menu when dragging off a pin
+	/** Populates the right-click context menu when dragging off a pin */
 	virtual void GetContextMenuActions(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const override;
 
+	/** Handle double-clicking a wire */
 	virtual void OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPin* PinB, const FVector2f& GraphPosition) const override;
 	
-	// Returns the name to display for this graph type in the editor
+	/** Returns the color to show on this pin type */
 	virtual FLinearColor GetPinTypeColor(const FEdGraphPinType& PinType) const override;
 
 	//virtual bool TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) const override;
@@ -57,4 +55,7 @@ public:
 	static void SetActiveDragFromPin(UEdGraphPin* Pin);
 	static UEdGraphPin* GetActiveDragFromPin();
 	static void ClearActiveDragFromPin();
+
+private:
+	TUniquePtr<FQuestlineGraphTraversalPolicy> TraversalPolicy;
 };

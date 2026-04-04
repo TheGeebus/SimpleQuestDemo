@@ -3,15 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EdGraph/EdGraphNode.h"
+#include "QuestlineNodeBase.h"
 #include "QuestlineNode_ContentBase.generated.h"
 
 UCLASS(Abstract)
-class SIMPLEQUESTEDITOR_API UQuestlineNode_ContentBase : public UEdGraphNode
+class SIMPLEQUESTEDITOR_API UQuestlineNode_ContentBase : public UQuestlineNodeBase
 {
 	GENERATED_BODY()
 
 public:
+	virtual bool IsContentNode() const override { return true; }
+	
 	virtual void AllocateDefaultPins() override;
 	virtual void AutowireNewNode(UEdGraphPin* FromPin) override;
 	virtual bool CanUserDeleteNode() const override { return true; }

@@ -13,10 +13,17 @@
 #include "Nodes/QuestlineNode_Entry.h"
 #include "Nodes/QuestlineNode_Exit_Success.h"
 #include "Nodes/QuestlineNode_Exit_Failure.h"
+#include "Utilities/QuestlineGraphTraversalPolicy.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
 #include "GameplayTagsManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+
+
+FQuestlineGraphCompiler::FQuestlineGraphCompiler()
+    : TraversalPolicy(MakeUnique<FQuestlineGraphTraversalPolicy>())
+{
+}
 
 
 // -------------------------------------------------------------------------------------------------
@@ -175,10 +182,16 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
         UEdGraphPin* FailurePin = ContentNode->FindPin(TEXT("Failure"), EGPD_Output);
         UEdGraphPin* AnyPin = ContentNode->FindPin(TEXT("Any Outcome"), EGPD_Output);
 
+        auto CheckExit = [this](UEdGraphPin* Pin) -> bool
+        {
+            TSet<const UEdGraphNode*> V;
+            return TraversalPolicy->HasDownstreamExit(Pin, V);
+        };
         CDO->bCompletesParentGraph =
-            (SuccessPin && PinLeadsToExit(SuccessPin)) ||
-            (FailurePin && PinLeadsToExit(FailurePin)) ||
-            (AnyPin && PinLeadsToExit(AnyPin));
+            (SuccessPin && CheckExit(SuccessPin)) ||
+            (FailurePin && CheckExit(FailurePin)) ||
+            (AnyPin && CheckExit(AnyPin));
+
     }
 
     // ---- Resolve entry tags from the graph's Entry node ----
@@ -328,22 +341,6 @@ UQuestNodeBase* FQuestlineGraphCompiler::GetCDOForContentNode(UQuestlineNode_Con
         return Cast<UQuestNodeBase>(LeafNode->StepClass->GetDefaultObject());
     }
     return nullptr;
-}
-
-bool FQuestlineGraphCompiler::PinLeadsToExit(UEdGraphPin* FromPin)
-{
-    for (UEdGraphPin* LinkedPin : FromPin->LinkedTo)
-    {
-        UEdGraphNode* Node = LinkedPin->GetOwningNode();
-        if (Cast<UQuestlineNode_Exit_Success>(Node) || Cast<UQuestlineNode_Exit_Failure>(Node))
-            return true;
-        if (const UQuestlineNode_Knot* Knot = Cast<UQuestlineNode_Knot>(Node))
-        {
-            if (UEdGraphPin* KnotOut = Knot->FindPin(TEXT("KnotOut"), EGPD_Output))
-                if (PinLeadsToExit(KnotOut)) return true;
-        }
-    }
-    return false;
 }
 
 FString FQuestlineGraphCompiler::SanitizeTagSegment(const FString& InLabel) const

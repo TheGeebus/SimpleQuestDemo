@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EdGraph/EdGraphNode.h"
+#include "QuestlineNodeBase.h"
 #include "QuestlineNode_Entry.generated.h"
 
 UCLASS()
-class UQuestlineNode_Entry : public UEdGraphNode
+class UQuestlineNode_Entry : public UQuestlineNodeBase
 {
 	GENERATED_BODY()
 
