@@ -164,9 +164,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LoadedQuests", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UQuest>> LoadedQuests;
 
-	/** Tag-to-class registry built at runtime from loaded questline graph assets. Used by ActivateNodeByTag. */
+	/** Node instances from all loaded questline graph assets, keyed by tag. Populated by ActivateQuestlineGraph. */
 	UPROPERTY()
-	TMap<FGameplayTag, TSubclassOf<UQuestNodeBase>> NodeTagToClass;
+	TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> LoadedNodeInstances;
 
 	/** Quick reference set of loaded quests. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LoadedQuests", meta = (AllowPrivateAccess = "true"))
@@ -192,10 +192,10 @@ protected:
 	virtual void SetQuestEnabled(const FGameplayTag QuestTag, const TSubclassOf<UQuest>& LoadedQuestClass, bool bIsEnabled);
 	virtual void ActivateQuestClass(const TSoftClassPtr<UQuest>& InQuestClass);
 
-	/** Registers all node classes from the graph into NodeTagToClass and activates its entry nodes. */
+	/** Registers all compiled node instances from the graph into LoadedNodeInstances and activates its entry nodes. */
 	virtual void ActivateQuestlineGraph(UQuestlineGraph* Graph);
 
-	/** Looks up the class for NodeTag in NodeTagToClass and activates the appropriate node. Delegates to ActivateQuestClass for UQuest subclasses. */
+	/** Looks up the instance for NodeTag in LoadedNodeInstances and activates it. */
 	virtual void ActivateNodeByTag(FGameplayTag NodeTag);
 
 	/** Chains to next nodes after a node completes, using tag-based routing from NextNodesOnSuccess / NextNodesOnFailure. */

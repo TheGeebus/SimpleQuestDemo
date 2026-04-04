@@ -45,12 +45,11 @@ private:
     TArray<FGameplayTag> EntryNodeTags;
 
     /**
-     * Maps every compiled node tag to its runtime class. Populated by the compiler. Includes all nodes from linked questline
-     * graphs inlined at compile time. Used by the subsystem to instantiate the correct UQuestNodeBase subclass when activating
-     * a node by tag.
+     * All compiled node instances, keyed by tag. Owned by this asset. Populated by the compiler — includes nodes inlined from
+     * linked questline graphs. The subsystem looks up and activates nodes directly from this map.
      */
     UPROPERTY()
-    TMap<FGameplayTag, TSubclassOf<UQuestNodeBase>> CompiledNodeClasses;
+    TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> CompiledNodes;
 
     /**
      * Identifier used as the Gameplay Tag scope for all quests in this questline. Must be unique across the project. Defaults
@@ -67,7 +66,7 @@ private:
 
 public:
     const TArray<FGameplayTag>& GetEntryNodeTags() const { return EntryNodeTags; }
-    const TMap<FGameplayTag, TSubclassOf<UQuestNodeBase>>& GetCompiledNodeClasses() const { return CompiledNodeClasses; }
+    const TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>>& GetCompiledNodes() const { return CompiledNodes; }
 
 
     // Editor-only: the actual UEdGraph object is only needed in the editor. The data it represents is compiled in-editor for use at runtime

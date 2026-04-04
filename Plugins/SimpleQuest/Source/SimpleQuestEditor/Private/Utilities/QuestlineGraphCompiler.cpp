@@ -4,7 +4,7 @@
 #include "Quests/QuestlineGraph.h"
 #include "Quests/QuestNodeBase.h"
 #include "Quests/QuestStep.h"
-#include "Quests/Quest.h"
+#include "Quests/QuestNode.h"
 #include "Nodes/QuestlineNode_ContentBase.h"
 #include "Nodes/QuestlineNode_Quest.h"
 #include "Nodes/QuestlineNode_Step.h"
@@ -18,6 +18,8 @@
 #include "EdGraph/EdGraphPin.h"
 #include "GameplayTagsManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Objectives/QuestObjective.h"
+#include "Rewards/QuestReward.h"
 
 
 FQuestlineGraphCompiler::FQuestlineGraphCompiler()
@@ -67,9 +69,9 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
 
     // Mark the graph asset as dirty, meaning it needs to be saved
     InGraph->Modify();
-    InGraph->CompiledNodeClasses.Empty();
+    InGraph->CompiledNodes.Empty(); 
     InGraph->EntryNodeTags.Empty();
-    AllCompiledNodeClasses.Empty();
+    AllCompiledNodes.Empty();
 
     // The graphs that have already been compiled. Provided to CompileGraph, which forwards it to all recursive calls.
     TArray<FString> VisitedAssetPaths;
@@ -79,7 +81,7 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
     // pass in from a parent graph yet.
     TArray<FGameplayTag> EntryTags = CompileGraph(InGraph, TagPrefix, {}, {}, VisitedAssetPaths);
     InGraph->EntryNodeTags = EntryTags;
-    InGraph->CompiledNodeClasses = MoveTemp(AllCompiledNodeClasses);
+    InGraph->CompiledNodes = MoveTemp(AllCompiledNodes);
 
     return !bHasErrors;
 }
@@ -95,49 +97,68 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
     if (!Graph || !Graph->QuestlineEdGraph) return {};
 
     // ---- Pass 1: label uniqueness, GUID write, tag assignment ----
+    // LinkedQuestline nodes are compiler-only scaffolding with no CDO; skip tag assignment
 
     TArray<UQuestlineNode_ContentBase*> ContentNodes;
     TMap<FString, UQuestlineNode_ContentBase*> LabelMap;
-
+    TMap<UQuestlineNode_ContentBase*, UQuestNodeBase*> NodeInstanceMap;
+    
     for (UEdGraphNode* Node : Graph->QuestlineEdGraph->Nodes)
     {
         UQuestlineNode_ContentBase* ContentNode = Cast<UQuestlineNode_ContentBase>(Node);
         if (!ContentNode) continue;
         ContentNodes.Add(ContentNode);
 
-        // LinkedQuestline nodes are compiler-only scaffolding with no CDO; skip tag assignment
+        // Linked questlines are erased. Their connections are resolved and tags are written in-line describing their context in the parent graph. 
         if (Cast<UQuestlineNode_LinkedQuestline>(ContentNode)) continue;
-
-        UQuestNodeBase* CDO = GetCDOForContentNode(ContentNode);
-        if (!CDO)
-        {
-            AddWarning(FString::Printf(TEXT("[%s] Content node '%s' has no class assigned and will be skipped."), *TagPrefix, *ContentNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString()));
-            continue;
-        }
 
         const FString Label = SanitizeTagSegment(ContentNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
         if (Label.IsEmpty())
         {
-            AddError(FString::Printf(TEXT("[%s] A content node has an empty label. All Quest and Leaf nodes must have a label before compiling."), *TagPrefix));
+            AddError(FString::Printf(TEXT("[%s] A content node has an empty label. All Quest and Step nodes must have a label before compiling."), *TagPrefix));
             continue;
         }
-
         if (LabelMap.Contains(Label))
         {
             AddError(FString::Printf(TEXT("[%s] Duplicate node label '%s'. Labels must be unique within a graph."), *TagPrefix, *Label));
+            continue;
         }
-        else
+        LabelMap.Add(Label, ContentNode);
+
+        // Create the appropriate runtime instance
+        UQuestNodeBase* Instance = nullptr;
+
+        if (Cast<UQuestlineNode_Quest>(ContentNode))
         {
-            LabelMap.Add(Label, ContentNode);
+            Instance = NewObject<UQuestNode>(Graph);
+        }
+        else if (UQuestlineNode_Step* StepNode = Cast<UQuestlineNode_Step>(ContentNode))
+        {
+            if (!StepNode->ObjectiveClass)
+            {
+                AddError(FString::Printf(TEXT("[%s] Step node '%s' has no Objective Class assigned."), *TagPrefix, *Label));
+                continue;
+            }
+            UQuestStep* StepInstance = NewObject<UQuestStep>(Graph);
+            StepInstance->QuestObjective = StepNode->ObjectiveClass;
+            StepInstance->Reward = StepNode->RewardClass;
+            StepInstance->TargetClass = StepNode->TargetClass;
+            StepInstance->NumberOfElements = StepNode->NumberOfElements;
+            StepInstance->TargetVector = StepNode->TargetVector;
+            StepInstance->TargetActors.Append(StepNode->TargetActors);
+            Instance = StepInstance;
         }
 
-        CDO->Modify();
-        CDO->QuestContentGuid = ContentNode->QuestGuid;
+        if (!Instance) continue;
 
-        const FName TagName(*FString::Printf(TEXT("Quest.%s.%s"), *TagPrefix, *Label));
+        Instance->QuestContentGuid = ContentNode->QuestGuid;
+        const FName TagName = MakeNodeTagName(TagPrefix, Label);
         UGameplayTagsManager::Get().AddNativeGameplayTag(TagName);
-        CDO->QuestTag = UGameplayTagsManager::Get().RequestGameplayTag(TagName);
+        Instance->QuestTag = UGameplayTagsManager::Get().RequestGameplayTag(TagName);
         Graph->CompiledQuestTags.Add(TagName);
+
+        AllCompiledNodes.Add(Instance->QuestTag, Instance);
+        NodeInstanceMap.Add(ContentNode, Instance);
     }
 
     if (bHasErrors) return {};
@@ -150,11 +171,11 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
         // while following the predecessor node's output pins
         if (Cast<UQuestlineNode_LinkedQuestline>(ContentNode)) continue;
 
-        UQuestNodeBase* CDO = GetCDOForContentNode(ContentNode);
-        if (!CDO) continue;
+        UQuestNodeBase* Instance = NodeInstanceMap.FindRef(ContentNode);
+        if (!Instance) continue;
 
-        CDO->NextNodesOnSuccess.Empty();
-        CDO->NextNodesOnFailure.Empty();
+        Instance->NextNodesOnSuccess.Empty();
+        Instance->NextNodesOnFailure.Empty();
 
         TArray<FGameplayTag> SuccessTags, FailureTags, AnyOutcomeTags;
 
@@ -170,12 +191,12 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
         {
             ResolvePinToTags(AnyOutcomePin, TagPrefix, SuccessBoundaryTags, FailureBoundaryTags, VisitedAssetPaths, AnyOutcomeTags);
         }
-        for (const FGameplayTag& Tag : SuccessTags) CDO->NextNodesOnSuccess.Add(Tag);
-        for (const FGameplayTag& Tag : FailureTags) CDO->NextNodesOnFailure.Add(Tag);
+        for (const FGameplayTag& Tag : SuccessTags) Instance->NextNodesOnSuccess.Add(Tag);
+        for (const FGameplayTag& Tag : FailureTags) Instance->NextNodesOnFailure.Add(Tag);
         for (const FGameplayTag& Tag : AnyOutcomeTags)
         {
-            CDO->NextNodesOnSuccess.Add(Tag);
-            CDO->NextNodesOnFailure.Add(Tag);
+            Instance->NextNodesOnSuccess.Add(Tag);
+            Instance->NextNodesOnFailure.Add(Tag);
         }
         // A node whose output chain reaches an exit should complete its parent graph on resolution
         UEdGraphPin* SuccessPin = ContentNode->FindPin(TEXT("Success"), EGPD_Output);
@@ -187,7 +208,7 @@ TArray<FGameplayTag> FQuestlineGraphCompiler::CompileGraph(UQuestlineGraph* Grap
             TSet<const UEdGraphNode*> V;
             return TraversalPolicy->HasDownstreamExit(Pin, V);
         };
-        CDO->bCompletesParentGraph =
+        Instance->bCompletesParentGraph =
             (SuccessPin && CheckExit(SuccessPin)) ||
             (FailurePin && CheckExit(FailurePin)) ||
             (AnyPin && CheckExit(AnyPin));
@@ -311,13 +332,18 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
             }
         }
 
-        // Quest or Leaf: return the QuestTag already assigned in CompileGraph Pass 1
+        // Quest or Step: return the tag assigned during Pass 1
         else if (UQuestlineNode_ContentBase* ContentNode = Cast<UQuestlineNode_ContentBase>(Node))
         {
-            if (const UQuestNodeBase* CDO = GetCDOForContentNode(ContentNode))
+            const FString Label = SanitizeTagSegment(ContentNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+            if (!Label.IsEmpty())
             {
-                if (CDO->QuestTag.IsValid())
-                    OutTags.AddUnique(CDO->QuestTag);
+                const FName TagName = MakeNodeTagName(TagPrefix, Label);
+                const FGameplayTag Tag = UGameplayTagsManager::Get().RequestGameplayTag(TagName, false);
+                if (Tag.IsValid())
+                {
+                    OutTags.AddUnique(Tag);
+                }
             }
         }
     }
@@ -328,21 +354,6 @@ void FQuestlineGraphCompiler::ResolvePinToTags(UEdGraphPin* FromPin, const FStri
 // Helpers
 // -------------------------------------------------------------------------------------------------
 
-UQuestNodeBase* FQuestlineGraphCompiler::GetCDOForContentNode(UQuestlineNode_ContentBase* ContentNode) const
-{
-    if (const UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(ContentNode))
-    {
-        if (!QuestNode->QuestClass) return nullptr;
-        return Cast<UQuestNodeBase>(QuestNode->QuestClass->GetDefaultObject());
-    }
-    if (const UQuestlineNode_Step* LeafNode = Cast<UQuestlineNode_Step>(ContentNode))
-    {
-        if (!LeafNode->StepClass) return nullptr;
-        return Cast<UQuestNodeBase>(LeafNode->StepClass->GetDefaultObject());
-    }
-    return nullptr;
-}
-
 FString FQuestlineGraphCompiler::SanitizeTagSegment(const FString& InLabel) const
 {
     FString Result = InLabel.TrimStartAndEnd();
@@ -352,6 +363,11 @@ FString FQuestlineGraphCompiler::SanitizeTagSegment(const FString& InLabel) cons
             Char = TEXT('_');
     }
     return Result;
+}
+
+FName FQuestlineGraphCompiler::MakeNodeTagName(const FString& TagPrefix, const FString& SanitizedLabel) const
+{
+    return FName(*FString::Printf(TEXT("Quest.%s.%s"), *TagPrefix, *SanitizedLabel));
 }
 
 void FQuestlineGraphCompiler::AddError(const FString& Message)

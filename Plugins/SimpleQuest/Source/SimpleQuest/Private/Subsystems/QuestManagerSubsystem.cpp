@@ -549,38 +549,29 @@ void UQuestManagerSubsystem::OnQuestTargetEnabledEvent(UQuest* InQuest, UObject*
 
 void UQuestManagerSubsystem::ActivateQuestlineGraph(UQuestlineGraph* Graph)
 {
-	if (!Graph) return;
+    if (!Graph) return;
 
-	for (const auto& Pair : Graph->GetCompiledNodeClasses())
-	{
-		NodeTagToClass.Add(Pair.Key, Pair.Value);
-	}
+    for (const auto& Pair : Graph->GetCompiledNodes())
+    {
+        LoadedNodeInstances.Add(Pair.Key, Pair.Value);
+    }
 
-	for (const FGameplayTag& EntryTag : Graph->GetEntryNodeTags())
-	{
-		ActivateNodeByTag(EntryTag);
-	}
+    for (const FGameplayTag& EntryTag : Graph->GetEntryNodeTags())
+    {
+        ActivateNodeByTag(EntryTag);
+    }
 }
 
-void UQuestManagerSubsystem::ActivateNodeByTag(const FGameplayTag NodeTag)
+void UQuestManagerSubsystem::ActivateNodeByTag(FGameplayTag NodeTag)
 {
-	const TSubclassOf<UQuestNodeBase>* ClassPtr = NodeTagToClass.Find(NodeTag);
-	if (!ClassPtr || !*ClassPtr)
+	TObjectPtr<UQuestNodeBase>* InstancePtr = LoadedNodeInstances.Find(NodeTag);
+	if (!InstancePtr || !*InstancePtr)
 	{
-		UE_LOG(LogSimpleQuest, Warning, TEXT("UQuestManagerSubsystem::ActivateNodeByTag : no class registered for tag '%s'"), *NodeTag.ToString());
+		UE_LOG(LogSimpleQuest, Warning, TEXT("UQuestManagerSubsystem::ActivateNodeByTag : no instance found for tag '%s'"), *NodeTag.ToString());
 		return;
 	}
 
-	if ((*ClassPtr)->IsChildOf(UQuest::StaticClass()))
-	{
-		ActivateQuestClass(TSoftClassPtr<UQuest>(*ClassPtr));
-	}
-	else
-	{
-		// Generic UQuestNodeBase subclass (e.g. UQuestStep leaf node)
-		UQuestNodeBase* Node = NewObject<UQuestNodeBase>(this, *ClassPtr);
-		Node->Activate(NodeTag);
-	}
+	(*InstancePtr)->Activate(NodeTag);
 }
 
 void UQuestManagerSubsystem::ChainToNextNodes(UQuestNodeBase* CompletedNode, bool bDidSucceed)

@@ -1,12 +1,11 @@
-﻿// Copyright 2026, Greg Bussell, All Rights Reserved.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "QuestlineNode_ContentBase.h"
+#include "Nodes/QuestlineNode_ContentBase.h"
 #include "QuestlineNode_Step.generated.h"
 
-class UQuestStep;
+class UQuestObjective;
+class UQuestReward;
 
 UCLASS()
 class SIMPLEQUESTEDITOR_API UQuestlineNode_Step : public UQuestlineNode_ContentBase
@@ -16,8 +15,23 @@ class SIMPLEQUESTEDITOR_API UQuestlineNode_Step : public UQuestlineNode_ContentB
 public:
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 
-	/** The step class this node compiles into. */
-	UPROPERTY(EditAnywhere, Category = "Quest")
-	TSubclassOf<UQuestStep> StepClass;
+	/** The objective that defines how this step is completed. Required for compilation. */
+	UPROPERTY(EditAnywhere, Category = "Step")
+	TSubclassOf<UQuestObjective> ObjectiveClass;
 
+	/** Optional reward granted on step completion. */
+	UPROPERTY(EditAnywhere, Category = "Step")
+	TSubclassOf<UQuestReward> RewardClass;
+
+	UPROPERTY(EditAnywhere, Category = "Step")
+	TArray<TSoftObjectPtr<AActor>> TargetActors;
+
+	UPROPERTY(EditAnywhere, Category = "Step")
+	TSubclassOf<AActor> TargetClass;
+
+	UPROPERTY(EditAnywhere, Category = "Step")
+	int32 NumberOfElements = 0;
+
+	UPROPERTY(EditAnywhere, Category = "Step")
+	FVector TargetVector = FVector::ZeroVector;
 };

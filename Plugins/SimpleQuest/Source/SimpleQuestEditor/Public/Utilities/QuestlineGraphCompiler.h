@@ -8,6 +8,7 @@
 class UQuestlineGraph;
 class UQuestlineNode_ContentBase;
 class UQuestNodeBase;
+class UQuestNode;
 class UEdGraphPin;
 class FQuestlineGraphTraversalPolicy;
 
@@ -69,6 +70,9 @@ protected:
 	 */
 	virtual FString SanitizeTagSegment(const FString& InLabel) const;
 
+	/** Constructs the FName used to register and look up a node's gameplay tag. */
+	virtual FName MakeNodeTagName(const FString& TagPrefix, const FString& SanitizedLabel) const;
+
 	/** Logs a compile error and sets the internal error flag. */
 	void AddError(const FString& Message);
 
@@ -79,7 +83,7 @@ protected:
 	bool bHasErrors = false;
 
 	/** Accumulates all compiled node classes across the full recursive compilation run. Written to the top-level graph by Compile(). */
-	TMap<FGameplayTag, TSubclassOf<UQuestNodeBase>> AllCompiledNodeClasses;
+	TMap<FGameplayTag, TObjectPtr<UQuestNodeBase>> AllCompiledNodes;
 
 	/**
 	 * Rules for moving between nodes. Subclass and register via ISimpleQuestEditorModule interface to override classification logic.
@@ -88,10 +92,5 @@ protected:
 	 */
 	TUniquePtr<FQuestlineGraphTraversalPolicy> TraversalPolicy;
 
-private:
-	/**
-	 * Returns the UQuestNodeBase CDO for a Quest or Leaf content node. Returns null for LinkedQuestline nodes (compiler-only,
-	 * no runtime class) and for Quest/Leaf nodes with no class assigned.
-	 */
-	UQuestNodeBase* GetCDOForContentNode(UQuestlineNode_ContentBase* ContentNode) const;
+
 };

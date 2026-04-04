@@ -8,6 +8,7 @@
 
 class UQuestObjective;
 
+
 /**
  * Concrete leaf node. Hosts a single UQuestObjective and the target data required to fulfil it. Replaces FQuestStep
  * once the unified graph model is fully in place.
@@ -16,6 +17,8 @@ UCLASS(Blueprintable)
 class SIMPLEQUEST_API UQuestStep : public UQuestNodeBase
 {
 	GENERATED_BODY()
+
+	friend class FQuestlineGraphCompiler; 
 
 public:
 	FORCEINLINE TSoftClassPtr<UQuestObjective> GetQuestObjective() const { return QuestObjective; }

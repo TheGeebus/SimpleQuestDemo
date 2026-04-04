@@ -7,7 +7,6 @@
 #include "Misc/Guid.h"
 #include "QuestlineNode_Quest.generated.h"
 
-class UQuest;
 
 UCLASS()
 class SIMPLEQUESTEDITOR_API UQuestlineNode_Quest : public UQuestlineNode_ContentBase
@@ -18,7 +17,4 @@ public:
 
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 
-	// The quest class this node represents
-	UPROPERTY(EditAnywhere, Category = "Quest")
-	TSubclassOf<UQuest> QuestClass;
 };

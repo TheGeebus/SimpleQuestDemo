@@ -7,12 +7,24 @@
 #include "QuestNode.generated.h"
 
 /**
- * Concrete internal graph node. Owns a child graph and manages activation of child nodes. UQuest is a temporary subclass
- * of this during the transition to the unified graph model and will be removed at the end of that transition.
+ * Compiler-generated runtime node representing a quest container (act, chapter, or group of steps). Instantiated directly by
+ * FQuestlineGraphCompiler, never authored as a Blueprint subclass. UQuest is a temporary legacy subclass retained for backwards
+ * compatibility during transition.
+ *
+ * When activated, starts the steps reachable from its inner Entry node. Completes when all inner paths reach an exit.
  */
-UCLASS(Abstract, Blueprintable)
+UCLASS(Blueprintable)
 class SIMPLEQUEST_API UQuestNode : public UQuestNodeBase
 {
 	GENERATED_BODY()
-	// Child graph execution model built out with the unified compiler.
+
+	friend class FQuestlineGraphCompiler;
+
+protected:
+	/** Tags of nodes to activate when this quest starts. Compiler-written from the inner Entry node connections. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
+	TArray<FGameplayTag> EntryStepTags;
+
+public:
+	FORCEINLINE const TArray<FGameplayTag>& GetEntryStepTags() const { return EntryStepTags; }
 };
