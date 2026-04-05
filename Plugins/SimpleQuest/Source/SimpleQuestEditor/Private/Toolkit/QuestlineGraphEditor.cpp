@@ -16,6 +16,7 @@
 #include "PropertyEditorModule.h"
 #include "Modules/ModuleManager.h"
 #include "Nodes/QuestlineNode_Entry.h"
+#include "Nodes/QuestlineNode_LinkedQuestline.h"
 #include "Nodes/QuestlineNode_Quest.h"
 #include "Quests/QuestNodeBase.h"
 #include "Toolkit/QuestlineOutlinerPanel.h"
@@ -419,47 +420,64 @@ TSharedRef<SDockTab> FQuestlineGraphEditor::SpawnOutlinerTab(const FSpawnTabArgs
         ];
 }
 
-FQuestlineGraphEditor::FEdNodeLocation FQuestlineGraphEditor::FindEdNodeLocation(const FGuid& ContentGuid) const
+static FQuestlineGraphEditor::FEdNodeLocation FindEdNodeInGraph(UEdGraph* Graph, const FGuid& ContentGuid)
 {
-    if (!QuestlineGraph || !QuestlineGraph->QuestlineEdGraph) return {};
+    if (!Graph) return {};
 
-    for (UEdGraphNode* Node : QuestlineGraph->QuestlineEdGraph->Nodes)
+    for (UEdGraphNode* Node : Graph->Nodes)
     {
-        UQuestlineNode_ContentBase* Content = Cast<UQuestlineNode_ContentBase>(Node);
-        if (!Content) continue;
-
-        if (Content->QuestGuid == ContentGuid)
-            return { QuestlineGraph->QuestlineEdGraph, Node };
-
-        if (UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(Content))
+        // GUID match — this node is the target
+        if (UQuestlineNode_ContentBase* Content = Cast<UQuestlineNode_ContentBase>(Node))
         {
-            if (UEdGraph* Inner = QuestNode->GetInnerGraph())
+            if (Content->QuestGuid == ContentGuid)
+                return { Graph, Node };
+        }
+
+        // Recurse into quest inner graphs
+        if (UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(Node))
+        {
+            if (UEdGraph* InnerGraph = QuestNode->GetInnerGraph())
             {
-                for (UEdGraphNode* InnerNode : Inner->Nodes)
+                FQuestlineGraphEditor::FEdNodeLocation Inner = FindEdNodeInGraph(InnerGraph, ContentGuid);
+                if (Inner.IsValid()) return Inner;
+            }
+        }
+
+        // Recurse into linked questline graphs
+        if (UQuestlineNode_LinkedQuestline* LinkedNode = Cast<UQuestlineNode_LinkedQuestline>(Node))
+        {
+            if (!LinkedNode->LinkedGraph.IsNull())
+            {
+                if (UQuestlineGraph* LinkedAsset = LinkedNode->LinkedGraph.LoadSynchronous())
                 {
-                    UQuestlineNode_ContentBase* InnerContent = Cast<UQuestlineNode_ContentBase>(InnerNode);
-                    if (InnerContent && InnerContent->QuestGuid == ContentGuid)
-                        return { Inner, InnerNode };
+                    FQuestlineGraphEditor::FEdNodeLocation Linked = FindEdNodeInGraph(LinkedAsset->QuestlineEdGraph, ContentGuid);
+                    if (Linked.IsValid()) return Linked;
                 }
             }
         }
     }
+
     return {};
 }
+
+FQuestlineGraphEditor::FEdNodeLocation FQuestlineGraphEditor::FindEdNodeLocation(const FGuid& ContentGuid) const
+{
+    return FindEdNodeInGraph(QuestlineGraph->QuestlineEdGraph, ContentGuid);
+}
+
 
 void FQuestlineGraphEditor::OnOutlinerItemNavigate(TSharedPtr<FQuestlineOutlinerItem> Item)
 {
     if (!Item.IsValid()) return;
 
-    // Local item — navigate within this editor
     if (Item->LinkDepth == 0)
     {
-        if (Item->ItemType == EOutlinerItemType::Root) return;  // nothing to navigate to
+        if (Item->ItemType == EOutlinerItemType::Root) return;
+
         NavigateToContentNode(Item->Node->GetQuestGuid());
         return;
     }
 
-    // Linked item — open or focus the source asset's editor
     UQuestlineGraph* SourceAsset = Item->SourceGraph;
     if (!SourceAsset) return;
 
@@ -478,7 +496,9 @@ void FQuestlineGraphEditor::OnOutlinerItemNavigate(TSharedPtr<FQuestlineOutliner
     }
     else
     {
-        LinkedEditor->NavigateToContentNode(Item->Node->GetQuestGuid());
+        FEdNodeLocation Location = FindEdNodeLocation(Item->Node->GetQuestGuid());
+        if (!Location.IsValid()) return;
+        LinkedEditor->NavigateToLocation(Location.HostGraph, Location.EdNode);
     }
 }
 
@@ -505,25 +525,9 @@ void FQuestlineGraphEditor::NavigateTo(UEdGraph* Graph)
 
 void FQuestlineGraphEditor::NavigateToContentNode(const FGuid& ContentGuid)
 {
-    FEdNodeLocation Location = FindEdNodeLocation(ContentGuid);
-    if (!Location.IsValid()) return;
-
-    UEdGraph* CurrentGraph = GraphBackwardStack.IsEmpty() ? nullptr : GraphBackwardStack.Last();
-
-    if (Location.HostGraph != CurrentGraph)
-    {
-        // If the target is an inner graph and we're not already at root, go to root first
-        if (Location.HostGraph != QuestlineGraph->QuestlineEdGraph && CurrentGraph != QuestlineGraph->QuestlineEdGraph)
-        {
-            NavigateTo(QuestlineGraph->QuestlineEdGraph);
-        }
-        NavigateTo(Location.HostGraph);
-    }
-
-    if (GraphEditorWidget.IsValid())
-    {
-        GraphEditorWidget->GetGraphEditor()->JumpToNode(Location.EdNode, false, true);
-    }
+    FEdNodeLocation Loc = FindEdNodeLocation(ContentGuid);
+    if (Loc.IsValid())
+        NavigateToLocation(Loc.HostGraph, Loc.EdNode);
 }
 
 void FQuestlineGraphEditor::NavigateToEntry()
@@ -542,6 +546,23 @@ void FQuestlineGraphEditor::NavigateToEntry()
             break;
         }
     }
+}
+
+void FQuestlineGraphEditor::NavigateToLocation(UEdGraph* HostGraph, UEdGraphNode* EdNode)
+{
+    if (!HostGraph || !EdNode) return;
+
+    UEdGraph* CurrentGraph = GraphBackwardStack.IsEmpty() ? nullptr : GraphBackwardStack.Last();
+
+    if (HostGraph != CurrentGraph)
+    {
+        if (HostGraph != QuestlineGraph->QuestlineEdGraph && CurrentGraph != QuestlineGraph->QuestlineEdGraph)
+            NavigateTo(QuestlineGraph->QuestlineEdGraph);
+        NavigateTo(HostGraph);
+    }
+
+    if (GraphEditorWidget.IsValid())
+        GraphEditorWidget->JumpToNodeWhenReady(EdNode);
 }
 
 void FQuestlineGraphEditor::NavigateBack()

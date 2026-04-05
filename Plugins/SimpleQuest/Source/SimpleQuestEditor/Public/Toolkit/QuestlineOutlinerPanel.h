@@ -72,4 +72,5 @@ private:
 	TArray<TSharedPtr<FQuestlineOutlinerItem>> RootItems;
 	TSharedPtr<STreeView<TSharedPtr<FQuestlineOutlinerItem>>> TreeView;
 	FOnOutlinerItemNavigate OnItemNavigate;
+	
 };

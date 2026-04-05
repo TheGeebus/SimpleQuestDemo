@@ -6,6 +6,7 @@
 #include "ISimpleQuestEditorModule.h"
 #include "SimpleQuestEditorModule.h"
 #include "NativeGameplayTags.h"
+#include "SimpleQuestLog.h"
 #include "Quests/QuestlineGraph.h"
 #include "Quests/QuestNodeBase.h"
 #include "Quests/QuestStep.h"
@@ -92,6 +93,7 @@ bool FQuestlineGraphCompiler::Compile(UQuestlineGraph* InGraph)
     TArray<FName> EntryTags = CompileGraph(InGraph->QuestlineEdGraph, TagPrefix, {}, {}, VisitedAssetPaths);
     InGraph->EntryNodeTags = EntryTags;
     InGraph->CompiledNodes = MoveTemp(AllCompiledNodes);
+    InGraph->CompiledEditorNodes = MoveTemp(AllCompiledEditorNodes);
     InGraph->CompiledQuestTags = MoveTemp(AllCompiledQuestTags);
     
     RegisterCompiledTags(InGraph);
@@ -121,11 +123,12 @@ TArray<FName> FQuestlineGraphCompiler::CompileGraph(UEdGraph* Graph, const FStri
         UQuestlineNode_ContentBase* ContentNode = Cast<UQuestlineNode_ContentBase>(Node);
         if (!ContentNode) continue;
         ContentNodes.Add(ContentNode);
+        const FString Label = SanitizeTagSegment(ContentNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
 
-        // Linked questlines are erased. Their connections are resolved and tags are written in-line describing their context in the parent graph. 
+        // Linked questlines are erased from the runtime data set. Their connections are resolved and tags are written in-line
+        // describing their context in the parent graph. 
         if (Cast<UQuestlineNode_LinkedQuestline>(ContentNode)) continue;
 
-        const FString Label = SanitizeTagSegment(ContentNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
         if (Label.IsEmpty())
         {
             AddError(FString::Printf(TEXT("[%s] A content node has an empty label. All Quest and Step nodes must have a label before compiling."), *TagPrefix));
@@ -169,11 +172,12 @@ TArray<FName> FQuestlineGraphCompiler::CompileGraph(UEdGraph* Graph, const FStri
         }
 
         if (!Instance) continue;
-
+        
         Instance->QuestContentGuid = ContentNode->QuestGuid;
         const FName TagName = MakeNodeTagName(TagPrefix, Label);
         AllCompiledQuestTags.Add(TagName);
         AllCompiledNodes.Add(TagName, Instance);
+        AllCompiledEditorNodes.Add(TagName, ContentNode);
         NodeInstanceMap.Add(ContentNode, Instance);
     }
 

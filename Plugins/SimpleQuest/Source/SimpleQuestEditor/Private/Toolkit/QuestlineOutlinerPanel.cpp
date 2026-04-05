@@ -3,6 +3,7 @@
 #include "Toolkit/QuestlineOutlinerPanel.h"
 
 #include "Nodes/QuestlineNode_LinkedQuestline.h"
+#include "Nodes/QuestlineNode_Quest.h"
 #include "Quests/QuestlineGraph.h"
 #include "Quests/QuestNodeBase.h"
 #include "Utilities/SimpleQuestEditorUtils.h"
@@ -109,13 +110,12 @@ void SQuestlineOutlinerPanel::RebuildTree()
     RootItems.Empty();
     if (!QuestlineGraph) return;
 
-    const FString QuestlineID = QuestlineGraph->GetQuestlineID().IsEmpty()
-        ? QuestlineGraph->GetName() : QuestlineGraph->GetQuestlineID();
+    const FString QuestlineID = QuestlineGraph->GetQuestlineID().IsEmpty() ? QuestlineGraph->GetName() : QuestlineGraph->GetQuestlineID();
 
     auto RootItem = MakeShared<FQuestlineOutlinerItem>();
-    RootItem->Tag         = FName(*QuestlineID);
+    RootItem->Tag = FName(*QuestlineID);
     RootItem->DisplayName = QuestlineID;
-    RootItem->ItemType    = EOutlinerItemType::Root;
+    RootItem->ItemType = EOutlinerItemType::Root;
 
     const TMap<FName, TObjectPtr<UQuestNodeBase>>& CompiledNodes = QuestlineGraph->GetCompiledNodes();
 
@@ -232,45 +232,61 @@ void SQuestlineOutlinerPanel::RebuildTree()
         TreeView->RequestTreeRefresh();
         TreeView->SetItemExpansion(RootItem, true);
         for (const auto& ItemPair : ItemMap)
+        {
             TreeView->SetItemExpansion(ItemPair.Value, true);
+        }
     }
     // Pass 6 — annotate SourceGraph for navigation
     // Local items always belong to the current asset
     for (auto& ItemPair : ItemMap)
     {
         if (ItemPair.Value->LinkDepth == 0)
+        {
             ItemPair.Value->SourceGraph = QuestlineGraph;
+        }
     }
 
     // Linked items need their source asset resolved from the graph's linked questline nodes
     TFunction<void(UEdGraph*, const FString&)> ResolveLinkedSources =
-        [&](UEdGraph* Graph, const FString& TagPrefix)   // TagPrefix is bare: e.g. "Chapter1", "Chapter1.Chapter2"
+        [&](UEdGraph* Graph, const FString& TagPrefix)
         {
             if (!Graph) return;
             for (UEdGraphNode* Node : Graph->Nodes)
             {
-                UQuestlineNode_LinkedQuestline* LinkedNode = Cast<UQuestlineNode_LinkedQuestline>(Node);
-                if (!LinkedNode || LinkedNode->LinkedGraph.IsNull()) continue;
-
-                UQuestlineGraph* LinkedAsset = LinkedNode->LinkedGraph.LoadSynchronous();
-                if (!LinkedAsset) continue;
-
-                const FString LinkedID = SimpleQuestEditorUtilities::SanitizeQuestlineTagSegment(
-                    LinkedAsset->GetQuestlineID().IsEmpty() ? LinkedAsset->GetName() : LinkedAsset->GetQuestlineID());
-
-                // Keep the prefix bare — no "Quest." — so recursion stays consistent
-                const FString LinkedPrefix = TagPrefix + TEXT(".") + LinkedID;
-                const FString FullLinkedPrefix = TEXT("Quest.") + LinkedPrefix;
-
-                for (auto& ItemPair : ItemMap)
+                if (UQuestlineNode_LinkedQuestline* LinkedNode = Cast<UQuestlineNode_LinkedQuestline>(Node))
                 {
-                    if (ItemPair.Value->SourceGraph) continue;
-                    if (ItemPair.Value->Tag.ToString().StartsWith(FullLinkedPrefix))
-                        ItemPair.Value->SourceGraph = LinkedAsset;
-                }
+                    if (LinkedNode->LinkedGraph.IsNull()) continue;
 
-                if (LinkedAsset->QuestlineEdGraph)
-                    ResolveLinkedSources(LinkedAsset->QuestlineEdGraph, LinkedPrefix);
+                    UQuestlineGraph* LinkedAsset = LinkedNode->LinkedGraph.LoadSynchronous();
+                    if (!LinkedAsset) continue;
+
+                    const FString LinkedID = SimpleQuestEditorUtilities::SanitizeQuestlineTagSegment(
+                        LinkedAsset->GetQuestlineID().IsEmpty() ? LinkedAsset->GetName() : LinkedAsset->GetQuestlineID());
+
+                    const FString LinkedPrefix = TagPrefix + TEXT(".") + LinkedID;
+                    const FString FullLinkedPrefix = TEXT("Quest.") + LinkedPrefix;
+
+                    for (auto& ItemPair : ItemMap)
+                    {
+                        if (ItemPair.Value->Tag.ToString().StartsWith(FullLinkedPrefix))
+                            ItemPair.Value->SourceGraph = LinkedAsset;
+                    }
+
+                    if (LinkedAsset->QuestlineEdGraph)
+                        ResolveLinkedSources(LinkedAsset->QuestlineEdGraph, LinkedPrefix);
+                }
+                else if (UQuestlineNode_Quest* QuestNode = Cast<UQuestlineNode_Quest>(Node))
+                {
+                    UEdGraph* InnerGraph = QuestNode->GetInnerGraph();
+                    if (!InnerGraph) continue;
+
+                    const FString QuestLabel = SimpleQuestEditorUtilities::SanitizeQuestlineTagSegment(
+                        QuestNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+                    if (QuestLabel.IsEmpty()) continue;
+
+                    const FString InnerPrefix = TagPrefix + TEXT(".") + QuestLabel;
+                    ResolveLinkedSources(InnerGraph, InnerPrefix);
+                }
             }
         };
 
@@ -295,3 +311,4 @@ void SQuestlineOutlinerPanel::GetChildQuestlineItems(TSharedPtr<FQuestlineOutlin
 {
     OutChildren = Item->Children;
 }
+

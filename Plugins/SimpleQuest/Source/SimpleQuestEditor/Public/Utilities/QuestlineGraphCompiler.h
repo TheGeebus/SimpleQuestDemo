@@ -74,7 +74,8 @@ protected:
 	 * call SimpleQuestEditorUtilities::SanitizeQuestlineTagSegment.
 	 */
 	virtual FString SanitizeTagSegment(const FString& InLabel) const;
-
+	
+	
 	/** Constructs the FName used to register and look up a node's gameplay tag. */
 	virtual FName MakeNodeTagName(const FString& TagPrefix, const FString& SanitizedLabel) const;
 
@@ -87,9 +88,18 @@ protected:
 	/** Internal questline compiler error flag. Returned by the main Compile function. */
 	bool bHasErrors = false;
 
-	/** Accumulates all compiled node classes across the full recursive compilation run. Written to the top-level graph by Compile(). */
+	/**
+	 * Accumulates all compiled node classes across the full recursive compilation run. This is the runtime data set, which inlines
+	 * linked questline graph nodes, effectively erasing them. Written to the top-level graph by Compile().
+	 */
 	TMap<FName, TObjectPtr<UQuestNodeBase>> AllCompiledNodes;
 
+	/**
+	 * Accumulates all compiled node classes across the full recursive compilation run. Includes linked graph nodes, which are
+	 * inlined in the runtime data set. This set is used for in-editor navigation. Written to the top-level graph by Compile().
+	 */
+	TMap<FName, TObjectPtr<UEdGraphNode>> AllCompiledEditorNodes;
+	
 	/** Accumulates all compiled quest tags across the full recursive compilation run. Written to the top-level graph by Compile(). */
 	TArray<FName> AllCompiledQuestTags;	
 

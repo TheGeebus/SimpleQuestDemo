@@ -82,6 +82,12 @@ public:
     UPROPERTY()
     TObjectPtr<UEdGraph> QuestlineEdGraph;
 
+    /**
+     * Compiled editor nodes, keyed by tag — mirrors CompiledNodes but holds the UEdGraphNode* for navigation.
+     * Populated by the compiler alongside CompiledNodes. Serialized so navigation works without recompiling after reload.
+     */
+    UPROPERTY(Transient)
+    TMap<FName, TObjectPtr<UEdGraphNode>> CompiledEditorNodes;
 #endif
 
 };

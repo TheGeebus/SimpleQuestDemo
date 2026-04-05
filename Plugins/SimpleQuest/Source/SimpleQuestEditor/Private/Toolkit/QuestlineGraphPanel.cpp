@@ -26,6 +26,18 @@ void SQuestlineGraphPanel::Construct(const FArguments& InArgs,
     FSlateApplication::Get().OnFocusChanging().AddSP(this, &SQuestlineGraphPanel::HandleFocusChanging);
 }
 
+void SQuestlineGraphPanel::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+    SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+    if (PendingJumpNode && bHasTicked)
+    {
+        GraphEditor->JumpToNode(PendingJumpNode, false, true);
+        PendingJumpNode = nullptr;
+    }
+    bHasTicked = true;
+}
+
+
 /*-------------------------------------------*
  *          Helpers
  *-------------------------------------------*/
@@ -142,6 +154,15 @@ void SQuestlineGraphPanel::HandleFocusChanging(const FFocusEvent& FocusEvent, co
 {
     // If focus has moved somewhere outside our subtree, any held hotkey is now stale
     if (HeldHotkey != EKeys::Invalid && !NewFocusedWidgetPath.ContainsWidget(this)) HeldHotkey = EKeys::Invalid;
+}
+
+void SQuestlineGraphPanel::JumpToNodeWhenReady(UEdGraphNode* Node)
+{
+    if (!Node || !GraphEditor.IsValid()) return;
+    if (bHasTicked)
+        GraphEditor->JumpToNode(Node, false, true);
+    else
+        PendingJumpNode = Node;
 }
 
 

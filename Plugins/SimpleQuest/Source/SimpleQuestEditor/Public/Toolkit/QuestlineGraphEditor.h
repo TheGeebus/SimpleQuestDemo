@@ -28,6 +28,13 @@ public:
 	virtual FLinearColor GetWorldCentricTabColorScale() const override;
 	virtual void RegisterTabSpawners(const TSharedRef<FTabManager>& InTabManager) override;
 	virtual void UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager) override;
+	
+	struct FEdNodeLocation
+	{
+		UEdGraph* HostGraph = nullptr;
+		UEdGraphNode* EdNode = nullptr;
+		bool IsValid() const { return HostGraph && EdNode; }
+	};
 
 private:
 	TSharedRef<SDockTab> SpawnGraphViewportTab(const FSpawnTabArgs& Args);
@@ -71,6 +78,8 @@ private:
 	 *----------------------------------------------------------------------------------*/
 
 	TSharedRef<SDockTab> SpawnOutlinerTab(const FSpawnTabArgs& Args);
+	void OnOutlinerItemNavigate(TSharedPtr<FQuestlineOutlinerItem> Item);
+	FEdNodeLocation FindEdNodeLocation(const FGuid& ContentGuid) const;
 
 	TSharedPtr<SQuestlineOutlinerPanel> OutlinerPanel;
 	static const FName OutlinerTabId;
@@ -93,15 +102,6 @@ private:
 	TSharedPtr<SBox> GraphPanelContainer;						// swapped by NavigateTo
 	TSharedPtr<SBreadcrumbTrail<UEdGraph*>> BreadcrumbTrail;	// updated by NavigateTo
 	bool bIsNavigatingHistory = false;
-	struct FEdNodeLocation
-	{
-		UEdGraph* HostGraph = nullptr;
-		UEdGraphNode* EdNode = nullptr;
-		bool IsValid() const { return HostGraph && EdNode; }
-	};
-
-	FEdNodeLocation FindEdNodeLocation(const FGuid& ContentGuid) const;
-	void OnOutlinerItemNavigate(TSharedPtr<FQuestlineOutlinerItem> Item);
 
 public:
 	void NavigateTo(UEdGraph* Graph);
@@ -111,5 +111,8 @@ public:
 
 	/** Navigate to this editor's root graph and select its Entry node. */
 	void NavigateToEntry();
+
+	
+	void NavigateToLocation(UEdGraph* HostGraph, UEdGraphNode* EdNode);
 	
 };

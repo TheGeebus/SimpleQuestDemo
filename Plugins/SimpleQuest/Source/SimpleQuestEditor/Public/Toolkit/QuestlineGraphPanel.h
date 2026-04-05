@@ -20,12 +20,16 @@ public:
 	TSharedPtr<SGraphEditor> GetGraphEditor() const { return GraphEditor; }
 
 	// SWidget interface
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 	virtual bool SupportsKeyboardFocus() const override { return false; }
 	virtual FReply OnPreviewKeyDown(const FGeometry&, const FKeyEvent&) override;
 	virtual FReply OnKeyDown(const FGeometry&, const FKeyEvent&) override;
 	virtual FReply OnKeyUp(const FGeometry&, const FKeyEvent&) override;
 	virtual FReply OnPreviewMouseButtonDown(const FGeometry&, const FPointerEvent&) override;
 
+	/** Schedules a JumpToNode after the SGraphEditor's first render pass clears its initial ZoomToFit. */
+	void JumpToNodeWhenReady(UEdGraphNode* Node);
+	
 private:
 	static bool IsHotkey(FKey Key);
 	FVector2D ToGraphCoords(const FGeometry& Geometry, FVector2D ScreenPos) const;
@@ -42,4 +46,8 @@ private:
 
 	void HandleFocusChanging(const FFocusEvent& FocusEvent, const FWeakWidgetPath& OldFocusedWidgetPath, const TSharedPtr<SWidget>& OldFocusedWidget,
 		const FWidgetPath& NewFocusedWidgetPath, const TSharedPtr<SWidget>& NewFocusedWidget);
+
+	UEdGraphNode* PendingJumpNode = nullptr;
+	bool bHasTicked = false;
+
 };
