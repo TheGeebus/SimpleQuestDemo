@@ -40,6 +40,8 @@ private:
 	void ExtendToolbar();
 	void FillToolbar(FToolBarBuilder& ToolbarBuilder);
 
+	FText GetGraphDisplayName(UEdGraph* Graph) const;
+
 	enum class EQuestlineCompileStatus : uint8 { Unknown, UpToDate, Error };
 
 	void OnGraphChanged(const FEdGraphEditAction& Action);
@@ -77,10 +79,18 @@ private:
 
 	void NavigateTo(UEdGraph* Graph);
 	void NavigateBack();
+	void NavigateForward();
+	void OnBreadcrumbClicked(UEdGraph* const& Graph);
 	void OnNodeDoubleClicked(UEdGraphNode* Node);
 
-	TArray<UEdGraph*> GraphNavigationStack;
-	TArray<FDelegateHandle> GraphChangedHandles;  // one per graph in stack
-	TSharedPtr<SBox> ViewportContainer;           // wraps the current SQuestlineGraphPanel
+	bool CanNavigateBack() const { return GraphBackwardStack.Num() > 1; }
+	bool CanNavigateForward() const { return GraphForwardStack.Num() > 0; }
+	
+	TArray<UEdGraph*> GraphBackwardStack;						// backwards-looking stack of opened graphs
+	TArray<UEdGraph*> GraphForwardStack;						// populates when using 'back' button, cleared on NavigateTo
+	TArray<FDelegateHandle> GraphChangedHandles;				// one per graph in stack
+	TSharedPtr<SBox> GraphPanelContainer;						// swapped by NavigateTo
+	TSharedPtr<SBreadcrumbTrail<UEdGraph*>> BreadcrumbTrail;	// updated by NavigateTo
+	bool bIsNavigatingHistory = false;
 
 };
